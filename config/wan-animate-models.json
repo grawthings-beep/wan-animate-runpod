@@ -1,0 +1,58 @@
+{
+  "models": [
+    {
+      "name": "Wan2.2 Animate 14B (fp8 e4m3fn scaled, KJ) - default",
+      "enabled": true,
+      "required": true,
+      "method": "curl",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled/resolve/main/Wan22Animate/Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+      "path": "models/diffusion_models/Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+      "min_bytes": 1073741824
+    },
+    {
+      "name": "Wan2.2 Animate 14B (bf16, full) - optional, big GPU only",
+      "enabled": false,
+      "required": false,
+      "method": "curl",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_animate_14B_bf16.safetensors",
+      "path": "models/diffusion_models/wan2.2_animate_14B_bf16.safetensors",
+      "min_bytes": 1073741824
+    },
+    {
+      "name": "UMT5-XXL text encoder (fp8 e4m3fn scaled)",
+      "enabled": true,
+      "required": true,
+      "method": "curl",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "path": "models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "min_bytes": 1073741824
+    },
+    {
+      "name": "CLIP Vision H",
+      "enabled": true,
+      "required": true,
+      "method": "curl",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors",
+      "path": "models/clip_vision/clip_vision_h.safetensors",
+      "min_bytes": 104857600
+    },
+    {
+      "name": "Wan 2.1 VAE",
+      "enabled": true,
+      "required": true,
+      "method": "curl",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors",
+      "path": "models/vae/wan_2.1_vae.safetensors",
+      "min_bytes": 10485760
+    },
+    {
+      "name": "LightX2V I2V 14B step-distill LoRA (fewer steps, recommended)",
+      "enabled": true,
+      "required": false,
+      "method": "curl",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "path": "models/loras/wan/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "min_bytes": 1048576
+    }
+  ]
+}
