@@ -13,8 +13,9 @@
 4. **Deploy a GPU pod.** First boot downloads ~25-30 GB of models to the volume
    (one time). Watch the pod logs for `DOWNLOAD:` lines.
 5. **Open ComfyUI** via RunPod Connect on port `8188`.
-6. Load `Workflow -> Browse Templates -> Video -> Wan2.2 Animate`, drop in your
-   reference image + driving dance video, and queue.
+6. Open `Workflow -> Open -> wan2_2_animate_character_replace` (or
+   `_full_scene`) — these are auto-installed on boot. Drop in your reference
+   image + driving dance video, and queue.
 
 ## Notes
 

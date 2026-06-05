@@ -20,6 +20,7 @@ RUN apt-get update \
 COPY custom_nodes.txt /opt/runpod-wan-animate/custom_nodes.txt
 COPY config/ /opt/runpod-wan-animate/config/
 COPY scripts/ /opt/runpod-wan-animate/scripts/
+COPY workflows/ /opt/runpod-wan-animate/workflows/
 
 RUN chmod +x /opt/runpod-wan-animate/scripts/*.sh \
     && /opt/runpod-wan-animate/scripts/install_custom_nodes.sh

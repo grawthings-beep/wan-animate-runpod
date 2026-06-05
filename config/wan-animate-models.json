@@ -53,6 +53,24 @@
       "url": "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
       "path": "models/loras/wan/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
       "min_bytes": 1048576
+    },
+    {
+      "name": "WanAnimate relight LoRA (used by official Animate templates)",
+      "enabled": true,
+      "required": false,
+      "method": "curl",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/LoRAs/Wan22_relight/WanAnimate_relight_lora_fp16.safetensors",
+      "path": "models/loras/wan/WanAnimate_relight_lora_fp16.safetensors",
+      "min_bytes": 1048576
+    },
+    {
+      "name": "SAM 2.1 Hiera base+ (auto mask / character replace via segment-anything-2)",
+      "enabled": true,
+      "required": false,
+      "method": "curl",
+      "url": "https://huggingface.co/Kijai/sam2-safetensors/resolve/main/sam2.1_hiera_base_plus.safetensors",
+      "path": "models/sam2/sam2.1_hiera_base_plus.safetensors",
+      "min_bytes": 1048576
     }
   ]
 }

@@ -1,5 +1,9 @@
 # name|git url|optional ref
-# Wan2.2 Animate native workflow needs KJNodes + controlnet_aux (DWPose) + video IO.
+# Nodes the official Comfy-Org Wan2.2 Animate templates require:
+#   KJNodes, WanAnimatePreprocess (pose/face via vitpose+yolo), segment-anything-2 (auto mask).
+# controlnet_aux + VideoHelperSuite are kept for older/manual DWPose-style graphs.
 ComfyUI-KJNodes|https://github.com/kijai/ComfyUI-KJNodes.git
+ComfyUI-WanAnimatePreprocess|https://github.com/kijai/ComfyUI-WanAnimatePreprocess.git
+ComfyUI-segment-anything-2|https://github.com/kijai/ComfyUI-segment-anything-2.git
 comfyui_controlnet_aux|https://github.com/Fannovel16/comfyui_controlnet_aux.git
 ComfyUI-VideoHelperSuite|https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git

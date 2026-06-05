@@ -72,15 +72,19 @@ steps — recommended for speed; drop it from the workflow for max quality.
 ## Custom Nodes (installed at build)
 
 - `ComfyUI-KJNodes`
-- `comfyui_controlnet_aux` (provides the DWPose estimator for the driving video)
+- `ComfyUI-WanAnimatePreprocess` (pose/face extraction via vitpose + yolo)
+- `ComfyUI-segment-anything-2` (auto mask / character replace)
+- `comfyui_controlnet_aux` (DWPose estimator, for older/manual graphs)
 - `ComfyUI-VideoHelperSuite` (load/save video)
 
-Native Wan2.2 Animate nodes ship with current ComfyUI core.
+The native Wan2.2 Animate sampling nodes ship with current ComfyUI core; the
+nodes above are what the official Animate templates additionally require.
 
 ## Workflow
 
-Wan2.2 Animate has an official **built-in ComfyUI template**. In the ComfyUI UI:
-`Workflow -> Browse Templates -> Video -> Wan2.2 Animate`. Set:
+The official Wan2.2 Animate templates are **bundled and auto-installed** on pod
+start — open them from `Workflow -> Open` (`wan2_2_animate_character_replace` or
+`wan2_2_animate_full_scene`). The loaders are pre-wired to:
 
 ```text
 Diffusion model : Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors

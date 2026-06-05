@@ -30,6 +30,7 @@ mkdir -p "${WORKSPACE_DIR}/input" \
          "${MODEL_ROOT}/models/diffusion_models" \
          "${MODEL_ROOT}/models/embeddings" \
          "${MODEL_ROOT}/models/loras/wan" \
+         "${MODEL_ROOT}/models/sam2" \
          "${MODEL_ROOT}/models/style_models" \
          "${MODEL_ROOT}/models/text_encoders" \
          "${MODEL_ROOT}/models/unet" \
@@ -51,6 +52,7 @@ workspace:
   diffusion_models: models/diffusion_models/
   embeddings: models/embeddings/
   loras: models/loras/
+  sam2: models/sam2/
   style_models: models/style_models/
   text_encoders: models/text_encoders/
   unet: models/unet/
@@ -62,6 +64,16 @@ YAML
 
 write_extra_model_paths "${COMFYUI_DIR}/extra_model_paths.yaml"
 write_extra_model_paths "${COMFYUI_DIR}/extra_model_paths.yml"
+
+# Install bundled workflow graphs so they appear in the ComfyUI Workflows menu.
+WORKFLOW_SRC="${WORKFLOW_SRC:-/opt/runpod-wan-animate/workflows}"
+WORKFLOW_DST="${WORKFLOW_DST:-${COMFYUI_DIR}/user/default/workflows}"
+if compgen -G "${WORKFLOW_SRC}/*.json" > /dev/null 2>&1; then
+  mkdir -p "${WORKFLOW_DST}"
+  # -n: never clobber a workflow the user edited and saved on the volume.
+  cp -n "${WORKFLOW_SRC}"/*.json "${WORKFLOW_DST}/" 2>/dev/null || true
+  echo "Installed bundled workflows into ${WORKFLOW_DST}"
+fi
 
 if [[ -n "${MODEL_MANIFEST_JSON:-}" ]]; then
   printf '%s' "${MODEL_MANIFEST_JSON}" > "${MODEL_MANIFEST}"

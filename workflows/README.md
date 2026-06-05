@@ -1,33 +1,35 @@
 # Workflows
 
-Wan2.2 Animate ships an **official built-in template** in current ComfyUI, so
-this folder intentionally does not bundle a hand-authored graph (a stale/invalid
-`.json` would just fail to load).
+These are the **official Comfy-Org Wan2.2 Animate templates**, fetched from
+[`Comfy-Org/workflow_templates`](https://github.com/Comfy-Org/workflow_templates):
 
-## Use the built-in template
+| File | Use |
+|------|-----|
+| `wan2_2_animate_character_replace.json` | Replace a character in a driving video (auto-masked via SAM2) |
+| `wan2_2_animate_full_scene.json` | Animate your reference character over the full scene |
 
-In the ComfyUI UI:
+On pod start, `scripts/start.sh` copies every `*.json` here into
+`<ComfyUI>/user/default/workflows/`, so they show up under **Workflows -> Open**
+(it uses `cp -n`, so a workflow you edit and save on the volume is never
+clobbered).
 
-```
-Workflow -> Browse Templates -> Video -> Wan2.2 Animate
-```
+## Required nodes / models (already wired)
 
-Then point the loaders at the files this image downloads:
+These graphs need more than the base Wan models. The template installs all of it:
 
-| Node | Value |
-|------|-------|
-| Load Diffusion Model | `Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors` |
-| Load CLIP / Text Encoder (umt5) | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` |
-| Load CLIP Vision | `clip_vision_h.safetensors` |
-| Load VAE | `wan_2.1_vae.safetensors` |
-| LoraLoader (optional, speed) | `lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors` |
-| Reference image | your character still (Anima LoRA output) |
-| Driving video | the dance clip (DWPose extracts pose/face automatically) |
+- **Custom nodes** (`custom_nodes.txt`): `ComfyUI-KJNodes`,
+  `ComfyUI-WanAnimatePreprocess` (pose/face via vitpose + yolo),
+  `ComfyUI-segment-anything-2` (auto mask).
+- **Models** (`config/wan-animate-models.json`): Wan2.2 Animate 14B fp8, umt5
+  text encoder, CLIP Vision H, Wan 2.1 VAE, LightX2V LoRA, **WanAnimate relight
+  LoRA**, and **SAM 2.1 Hiera base+** (`models/sam2/`).
+- `ComfyUI-WanAnimatePreprocess` downloads its `vitpose-l-wholebody.onnx` /
+  `yolov10m.onnx` detection models itself on first run.
 
 ## Saving your own
 
-Once you have a run you like, **export it** (`Workflow -> Export`) and commit the
-`.json` here. Committed workflows show up in the template/Open list on the pod.
+Tweak a graph in the UI, then **Workflow -> Export** and commit the `.json` here.
+It'll be installed on the next pod start alongside the bundled ones.
 
 ## Tips
 
