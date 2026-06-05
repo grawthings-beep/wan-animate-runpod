@@ -16,7 +16,7 @@ PYTHON_BIN="$(find_python_bin)" || {
 WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace/comfyui}"
 MODEL_ROOT="${MODEL_ROOT:-${WORKSPACE_DIR}}"
 CONFIG_DIR="${CONFIG_DIR:-/workspace/config}"
-MODEL_MANIFEST="${MODEL_MANIFEST:-${CONFIG_DIR}/wan-animate-models.json}"
+MODEL_MANIFEST="${MODEL_MANIFEST:-${CONFIG_DIR}/ltx-models.json}"
 PORT="${PORT:-8188}"
 LISTEN="${LISTEN:-0.0.0.0}"
 
@@ -29,8 +29,8 @@ mkdir -p "${WORKSPACE_DIR}/input" \
          "${MODEL_ROOT}/models/controlnet" \
          "${MODEL_ROOT}/models/diffusion_models" \
          "${MODEL_ROOT}/models/embeddings" \
-         "${MODEL_ROOT}/models/loras/wan" \
-         "${MODEL_ROOT}/models/sam2" \
+         "${MODEL_ROOT}/models/loras/ltx2" \
+         "${MODEL_ROOT}/models/latent_upscale_models" \
          "${MODEL_ROOT}/models/style_models" \
          "${MODEL_ROOT}/models/text_encoders" \
          "${MODEL_ROOT}/models/unet" \
@@ -52,7 +52,7 @@ workspace:
   diffusion_models: models/diffusion_models/
   embeddings: models/embeddings/
   loras: models/loras/
-  sam2: models/sam2/
+  latent_upscale_models: models/latent_upscale_models/
   style_models: models/style_models/
   text_encoders: models/text_encoders/
   unet: models/unet/
@@ -89,8 +89,8 @@ request = urllib.request.Request(url, headers={"User-Agent": "runpod-wan-animate
 with urllib.request.urlopen(request, timeout=60) as response:
     output.write_bytes(response.read())
 PY
-elif [[ ! -f "${MODEL_MANIFEST}" && -f /opt/runpod-wan-animate/config/wan-animate-models.json ]]; then
-  cp /opt/runpod-wan-animate/config/wan-animate-models.json "${MODEL_MANIFEST}"
+elif [[ ! -f "${MODEL_MANIFEST}" && -f /opt/runpod-wan-animate/config/ltx-models.json ]]; then
+  cp /opt/runpod-wan-animate/config/ltx-models.json "${MODEL_MANIFEST}"
 fi
 
 # Optional: extra manifest to add more LoRAs/checkpoints without editing the base.

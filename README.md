@@ -1,14 +1,14 @@
-# RunPod Wan2.2 Animate (ComfyUI)
+# RunPod LTX-2.3 v2v (ComfyUI)
 
-RunPod ComfyUI Pod template for **Wan2.2 Animate** — pose- and face-driven
-character animation. Feed **one reference image** (e.g. an Anima LoRA still) plus
-a **driving dance video**, and Wan2.2 Animate transfers the motion + expressions
-onto your character while preserving its identity. Best open-weight option for
-"make this character dance" as of mid-2026.
+RunPod ComfyUI Pod template for **LTX-2.3 Video-to-Video (distilled GGUF)**. Feed
+a **reference image** + a **driving video** and either transfer the motion onto
+your image (Motion Track: Depth / Canny / OpenPose) or edit/replace parts of the
+video by prompt (Inpaint Edit). Workflow: javano2604 v1.1.2.
 
-This image bakes only ComfyUI startup glue, custom-node install, and downloader
-scripts. Model files are downloaded into `/workspace/comfyui/models` at Pod
-startup so a persistent RunPod volume reuses them.
+> Note: the repo is still named `wan-animate-runpod` for history; it now ships the
+> LTX-2.3 v2v stack. The image bakes only ComfyUI startup glue, custom-node
+> install, and the downloader. Models download into `/workspace/comfyui/models`
+> at boot so a persistent volume reuses them.
 
 ## Container Image
 
@@ -18,7 +18,7 @@ GitHub Actions builds on push to `main`:
 ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
 ```
 
-After the first successful build, set the GHCR package visibility to **Public**
+After the first build, set the GHCR package visibility to **Public**
 (Packages -> this package -> Package settings), or RunPod needs a registry secret.
 
 ## RunPod Template
@@ -28,14 +28,14 @@ Type: Pod
 Compute type: Nvidia GPU
 Container image: ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
 Container disk: 40 GB
-Volume disk: 120 GB+        (the 14B model + encoders are large)
+Volume disk: 150 GB+        (GGUF 22B + Gemma 12B + VAEs are large)
 Volume mount path: /workspace
 Expose HTTP ports: 8188
 ```
 
-GPU: the default model is the **fp8 14B** build (~16 GB weights), which fits a
-**24 GB GPU (RTX 4090)** with `--reserve-vram`. For headroom or the bf16 build,
-use **A100 80GB / H100**.
+**GPU:** LTX-2.3 22B Q8 GGUF (~20 GB) + Gemma 3 12B fp8 (~12 GB) want **48 GB+
+VRAM** (A100 / H100 / L40S) to avoid heavy offload. A 24 GB card runs but will be
+slow from CPU offload — pick a bigger GPU on RunPod.
 
 Environment variables (see `runpod-template.env.example`):
 
@@ -45,73 +45,53 @@ LISTEN=0.0.0.0
 DOWNLOAD_MODELS=1
 RUN_DEP_CHECK=0
 HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
-MODEL_MANIFEST_URL=https://raw.githubusercontent.com/grawthings-beep/wan-animate-runpod/main/config/wan-animate-models.json
+MODEL_MANIFEST_URL=https://raw.githubusercontent.com/grawthings-beep/wan-animate-runpod/main/config/ltx-models.json
 COMFYUI_ARGS=--reserve-vram 2
 ```
 
-All model files are public on Hugging Face, so `HF_TOKEN` is optional.
+All model files are public on Hugging Face, so `HF_TOKEN` is optional. You can
+leave `MODEL_MANIFEST_URL` unset — the image bakes `config/ltx-models.json`.
 
-## Model Layout
-
-Startup downloads (default set — fp8):
+## Model Layout (auto-downloaded)
 
 ```text
-models/diffusion_models/Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors
-models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
-models/clip_vision/clip_vision_h.safetensors
-models/vae/wan_2.1_vae.safetensors
-models/loras/wan/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors
+models/unet/LTX-2.3-distilled-Q8_0.gguf
+models/text_encoders/gemma_3_12B_it_fp8_scaled.safetensors
+models/text_encoders/ltx-2.3_text_projection_bf16.safetensors
+models/vae/LTX23_video_vae_bf16.safetensors
+models/vae/LTX23_audio_vae_bf16.safetensors
+models/vae/taeltx2_3.safetensors                       (preview)
+models/latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors
+models/loras/ltx2/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors
 ```
 
-To train/run on the **full bf16** diffusion model instead, enable the
-`wan2.2_animate_14B_bf16` entry in `config/wan-animate-models.json` (big GPU only).
-
-`lightx2v` is a step-distill LoRA that lets you generate in far fewer sampling
-steps — recommended for speed; drop it from the workflow for max quality.
+Depth/DWPose preprocessor models are auto-downloaded by `comfyui_controlnet_aux`.
 
 ## Custom Nodes (installed at build)
 
-- `ComfyUI-KJNodes`
-- `ComfyUI-WanAnimatePreprocess` (pose/face extraction via vitpose + yolo)
-- `ComfyUI-segment-anything-2` (auto mask / character replace)
-- `comfyui_controlnet_aux` (DWPose estimator, for older/manual graphs)
+- `ComfyUI-LTXVideo` (LTX-2.3 sampling, IC-LoRA, AV latent, upsampler)
+- `ComfyUI-KJNodes` (GGUFLoaderKJ, VAELoaderKJ, LatentUpscaleModelLoader)
+- `ComfyUI-Impact-Pack` (conditional branch / switch nodes)
+- `ComfyUI-Easy-Use` (loraStack, math/logic helpers)
+- `comfyui_controlnet_aux` (Depth / Canny / DWPose preprocessors)
+- `ComfyUI-RMBG` (background removal)
 - `ComfyUI-VideoHelperSuite` (load/save video)
-
-The native Wan2.2 Animate sampling nodes ship with current ComfyUI core; the
-nodes above are what the official Animate templates additionally require.
 
 ## Workflow
 
-The official Wan2.2 Animate templates are **bundled and auto-installed** on pod
-start — open them from `Workflow -> Open` (`wan2_2_animate_character_replace` or
-`wan2_2_animate_full_scene`). The loaders are pre-wired to:
-
-```text
-Diffusion model : Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors
-Text encoder    : umt5_xxl_fp8_e4m3fn_scaled.safetensors
-CLIP vision     : clip_vision_h.safetensors
-VAE             : wan_2.1_vae.safetensors
-(optional LoRA) : lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors
-Reference image : your character still (Anima LoRA output)
-Driving video   : the dance clip to transfer motion from
-```
-
-See `workflows/README.md` for tips. A `.json` you export from a working run can
-be committed under `workflows/` so it loads with the template list.
-
-## Pipeline Fit
-
-```text
-Anima LoRA still (ComfyUI) -> Wan2.2 Animate (this repo) + dance driving video
-  -> dancing clip -> auto-mosaic (SAM2 / auto-mosaic-tool) for distribution
-```
+The LTX-2.3 v2v workflow is **bundled and auto-installed** on pod start — open it
+from `Workflow -> Open -> ltx2.3_v2v_javano2604`. All loaders are pre-wired to the
+files above. See `workflows/README.md` for the model/folder table and tips.
 
 ## Troubleshooting
 
-- **`CUDA unknown error` / `devices = 0` crash loop:** the host driver is older
-  than the `runpod/comfyui:latest` base image's CUDA build. Redeploy on a fresh
-  GPU/host, or pin `ARG BASE_IMAGE` in the `Dockerfile` to a known-good tag.
-- **OOM on a 24 GB GPU:** keep the **fp8** model (default), use the `lightx2v`
-  LoRA, lower resolution/frame count, and raise `--reserve-vram`.
+- **`SageAttention` import/attn error:** the main `GGUFLoaderKJ` uses `sageattn`.
+  If the base image lacks SageAttention, set that widget to `sdpa`.
+- **Slow despite "distilled":** you're offloading — use a 48 GB+ GPU, and keep the
+  step count low (distilled is built for few steps).
+- **A loader dropdown can't see a model:** ComfyUI's `models_dir` may differ from
+  the volume. Confirm the file is under `/workspace/comfyui/models/<folder>` and
+  that `<folder>` is mapped in the generated `extra_model_paths.yaml`, then
+  restart ComfyUI (it scans model folders at startup).
 - **Model re-downloads every boot:** ensure the volume is mounted at `/workspace`
   and models live under `/workspace/comfyui/models`.

@@ -1,26 +1,26 @@
 # RunPod quick steps
 
-1. **Push this repo to GitHub** as `wan-animate-runpod` (main branch). GitHub
-   Actions builds `ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8`.
-2. **Make the GHCR package Public** (Packages -> package -> settings), so RunPod
+1. **Push to GitHub** (`main`). GitHub Actions builds
+   `ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8`.
+2. **Make the GHCR package Public** (Packages -> package -> settings) so RunPod
    can pull without a registry secret.
 3. **Create a RunPod Pod template:**
    - Container image: `ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8`
-   - Volume mount path: `/workspace`, Volume disk `120 GB+`, Container disk `40 GB`
+   - Volume mount path: `/workspace`, Volume disk `150 GB+`, Container disk `40 GB`
    - Expose HTTP port `8188`
-   - Env: copy from `runpod-template.env.example` (set `MODEL_MANIFEST_URL` to your
-     repo's raw config URL; `HF_TOKEN` optional).
-4. **Deploy a GPU pod.** First boot downloads ~25-30 GB of models to the volume
-   (one time). Watch the pod logs for `DOWNLOAD:` lines.
+   - Env: copy from `runpod-template.env.example` (`HF_TOKEN` optional;
+     `MODEL_MANIFEST_URL` can be left unset — the image bakes the manifest).
+4. **Deploy on a big GPU** (48 GB+ VRAM: A100 / H100 / L40S). First boot downloads
+   ~35 GB of models to the volume (one time). Watch logs for `DOWNLOAD:` lines.
 5. **Open ComfyUI** via RunPod Connect on port `8188`.
-6. Open `Workflow -> Open -> wan2_2_animate_character_replace` (or
-   `_full_scene`) — these are auto-installed on boot. Drop in your reference
-   image + driving dance video, and queue.
+6. Open `Workflow -> Open -> ltx2.3_v2v_javano2604` (auto-installed on boot). Drop
+   in your reference image + driving video, pick a control mode (Depth / Canny /
+   OpenPose), and queue.
 
 ## Notes
 
-- Default diffusion model is **fp8 14B** (fits 24 GB). For bf16, enable that entry
-  in `config/wan-animate-models.json` and use an 80 GB GPU.
-- If ComfyUI crash-loops with `CUDA unknown error`, the host driver is too old for
-  the base image — redeploy on a different GPU/host, or pin `BASE_IMAGE` in the
-  `Dockerfile`. See README troubleshooting.
+- 48 GB+ VRAM strongly recommended: LTX-2.3 22B Q8 (~20 GB) + Gemma 12B (~12 GB).
+  A 24 GB card offloads to CPU and gets slow.
+- If the main loader errors on `sageattn`, switch `GGUFLoaderKJ` to `sdpa`.
+- If a loader can't see a downloaded model, confirm it's under
+  `/workspace/comfyui/models/<folder>` and restart ComfyUI (it scans at startup).
