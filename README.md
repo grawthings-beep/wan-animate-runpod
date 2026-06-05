@@ -15,7 +15,7 @@ startup so a persistent RunPod volume reuses them.
 GitHub Actions builds on push to `main`:
 
 ```text
-ghcr.io/YOUR_GITHUB_USER/wan-animate-runpod:cuda12.8
+ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
 ```
 
 After the first successful build, set the GHCR package visibility to **Public**
@@ -26,7 +26,7 @@ After the first successful build, set the GHCR package visibility to **Public**
 ```text
 Type: Pod
 Compute type: Nvidia GPU
-Container image: ghcr.io/YOUR_GITHUB_USER/wan-animate-runpod:cuda12.8
+Container image: ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
 Container disk: 40 GB
 Volume disk: 120 GB+        (the 14B model + encoders are large)
 Volume mount path: /workspace
@@ -45,7 +45,7 @@ LISTEN=0.0.0.0
 DOWNLOAD_MODELS=1
 RUN_DEP_CHECK=0
 HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
-MODEL_MANIFEST_URL=https://raw.githubusercontent.com/YOUR_GITHUB_USER/wan-animate-runpod/main/config/wan-animate-models.json
+MODEL_MANIFEST_URL=https://raw.githubusercontent.com/grawthings-beep/wan-animate-runpod/main/config/wan-animate-models.json
 COMFYUI_ARGS=--reserve-vram 2
 ```
 

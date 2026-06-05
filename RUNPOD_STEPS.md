@@ -1,11 +1,11 @@
 # RunPod quick steps
 
 1. **Push this repo to GitHub** as `wan-animate-runpod` (main branch). GitHub
-   Actions builds `ghcr.io/<you>/wan-animate-runpod:cuda12.8`.
+   Actions builds `ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8`.
 2. **Make the GHCR package Public** (Packages -> package -> settings), so RunPod
    can pull without a registry secret.
 3. **Create a RunPod Pod template:**
-   - Container image: `ghcr.io/<you>/wan-animate-runpod:cuda12.8`
+   - Container image: `ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8`
    - Volume mount path: `/workspace`, Volume disk `120 GB+`, Container disk `40 GB`
    - Expose HTTP port `8188`
    - Env: copy from `runpod-template.env.example` (set `MODEL_MANIFEST_URL` to your
