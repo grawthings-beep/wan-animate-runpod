@@ -75,10 +75,14 @@ if compgen -G "${WORKFLOW_SRC}/*.json" > /dev/null 2>&1; then
   echo "Installed bundled workflows into ${WORKFLOW_DST}"
 fi
 
+manifest_ready=0
 if [[ -n "${MODEL_MANIFEST_JSON:-}" ]]; then
   printf '%s' "${MODEL_MANIFEST_JSON}" > "${MODEL_MANIFEST}"
+  manifest_ready=1
 elif [[ -n "${MODEL_MANIFEST_URL:-}" ]]; then
-  "${PYTHON_BIN}" - "${MODEL_MANIFEST_URL}" "${MODEL_MANIFEST}" <<'PY'
+  # Non-fatal: a bad/stale URL (e.g. 404) must fall back to the baked manifest,
+  # not crash-loop the pod. The fetch runs inside the `if` so set -e won't kill us.
+  if "${PYTHON_BIN}" - "${MODEL_MANIFEST_URL}" "${MODEL_MANIFEST}" <<'PY'
 import pathlib
 import sys
 import urllib.request
@@ -89,7 +93,14 @@ request = urllib.request.Request(url, headers={"User-Agent": "runpod-wan-animate
 with urllib.request.urlopen(request, timeout=60) as response:
     output.write_bytes(response.read())
 PY
-elif [[ ! -f "${MODEL_MANIFEST}" && -f /opt/runpod-wan-animate/config/ltx-models.json ]]; then
+  then
+    manifest_ready=1
+  else
+    echo "WARN: MODEL_MANIFEST_URL fetch failed (${MODEL_MANIFEST_URL}); falling back to baked manifest." >&2
+  fi
+fi
+
+if [[ "${manifest_ready}" != "1" && ! -f "${MODEL_MANIFEST}" && -f /opt/runpod-wan-animate/config/ltx-models.json ]]; then
   cp /opt/runpod-wan-animate/config/ltx-models.json "${MODEL_MANIFEST}"
 fi
 
