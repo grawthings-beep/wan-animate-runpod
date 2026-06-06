@@ -2,6 +2,7 @@
 # Nodes required by the LTX-2.3 v2v (distilled GGUF) workflow.
 ComfyUI-LTXVideo|https://github.com/Lightricks/ComfyUI-LTXVideo.git
 ComfyUI-KJNodes|https://github.com/kijai/ComfyUI-KJNodes.git
+ComfyUI-GGUF|https://github.com/city96/ComfyUI-GGUF.git
 ComfyUI-Impact-Pack|https://github.com/ltdrdata/ComfyUI-Impact-Pack.git
 ComfyUI-Easy-Use|https://github.com/yolain/ComfyUI-Easy-Use.git
 comfyui_controlnet_aux|https://github.com/Fannovel16/comfyui_controlnet_aux.git
