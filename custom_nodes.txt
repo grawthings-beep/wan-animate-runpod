@@ -1,10 +1,16 @@
-# name|git url|optional ref
-# Nodes required by the LTX-2.3 v2v (distilled GGUF) workflow.
-ComfyUI-LTXVideo|https://github.com/Lightricks/ComfyUI-LTXVideo.git
-ComfyUI-KJNodes|https://github.com/kijai/ComfyUI-KJNodes.git
-ComfyUI-GGUF|https://github.com/city96/ComfyUI-GGUF.git
-ComfyUI-Impact-Pack|https://github.com/ltdrdata/ComfyUI-Impact-Pack.git
-ComfyUI-Easy-Use|https://github.com/yolain/ComfyUI-Easy-Use.git
-comfyui_controlnet_aux|https://github.com/Fannovel16/comfyui_controlnet_aux.git
-ComfyUI-RMBG|https://github.com/1038lab/ComfyUI-RMBG.git
-ComfyUI-VideoHelperSuite|https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git
+# name|git url|pinned commit
+# Exact dependencies used by WAN 2.2 Smooth Workflow v6.0 AIO.
+comfyui-adaptiveprompts|https://github.com/Alectriciti/comfyui-adaptiveprompts.git|5cbad6ef1c211ad66e52026679a5cf664aded043
+comfy_mtb|https://github.com/melMass/comfy_mtb.git|b35b5d8a17c0d59e80a8b3627b679c2c1003d04f
+rgthree-comfy|https://github.com/rgthree/rgthree-comfy.git|27b4f4cdcf3b127c29d5d8135ac1536ecbd4c383
+ComfyUI-MMAudio|https://github.com/kijai/ComfyUI-MMAudio.git|8eaeb72edc3aaf2059b57f2d96a1f6f689f19ae2
+ComfyUI-WanVideoWrapper|https://github.com/kijai/ComfyUI-WanVideoWrapper.git|088128b224242e110d3906c6750e9a3a348a659b
+ComfyUI-VideoHelperSuite|https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git|4ee72c065db22c9d96c2427954dc69e7b908444b
+ComfyUI-Frame-Interpolation|https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git|26545cc2dd95bc3d27f056016300673bdeee78f5
+ComfyUI-VFI|https://github.com/GACLove/ComfyUI-VFI.git|6176a430f12cd16003f4664c1e3c6af8e96cc3c6
+ComfyUI-KJNodes|https://github.com/kijai/ComfyUI-KJNodes.git|e27a505b3ba6ce42687fe00500deda103d9d6071
+ComfyUI-Easy-Use|https://github.com/yolain/ComfyUI-Easy-Use.git|54d080bf6a4f52da287e984f305243c10db097f5
+ComfyUI-NAG|https://github.com/scottmudge/ComfyUI-NAG.git|c6f27116a8259f5b501d498a09e51c82fa72e35f
+ComfyUI_Comfyroll_CustomNodes|https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git|d78b780ae43fcf8c6b7c6505e6ffb4584281ceca
+ComfyUI-GGUF|https://github.com/city96/ComfyUI-GGUF.git|6ea2651e7df66d7585f6ffee804b20e92fb38b8a
+ComfyUI-mxToolkit|https://github.com/Smirnov75/ComfyUI-mxToolkit.git|7f7a0e584f12078a1c589645d866ae96bad0cc35

@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-# ComfyUI base with native Wan2.2 support. Pin if :latest drifts onto a CUDA
-# build newer than available RunPod host drivers (see README troubleshooting).
-ARG BASE_IMAGE=runpod/comfyui:latest
+# Pinned instead of :latest so a future RunPod image cannot silently break the
+# workflow/custom-node combination. Override at build time when intentionally
+# testing a newer image.
+ARG BASE_IMAGE=runpod/comfyui:1.4.4-cuda12.8
 FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -14,7 +15,10 @@ RUN apt-get update \
         aria2 \
         ca-certificates \
         curl \
+        ffmpeg \
         git \
+        libgl1 \
+        libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY custom_nodes.txt /opt/runpod-wan-animate/custom_nodes.txt

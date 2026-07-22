@@ -1,97 +1,132 @@
-# RunPod LTX-2.3 v2v (ComfyUI)
+# WAN 2.2 Smooth Workflow v6.0 on RunPod
 
-RunPod ComfyUI Pod template for **LTX-2.3 Video-to-Video (distilled GGUF)**. Feed
-a **reference image** + a **driving video** and either transfer the motion onto
-your image (Motion Track: Depth / Canny / OpenPose) or edit/replace parts of the
-video by prompt (Inpaint Edit). Workflow: javano2604 v1.1.2.
+RunPod上で **SmoothMix WAN 2.2 I2V/T2V、First-to-Last Frame、MMAudio、RIFE補間**を動かすためのComfyUIイメージです。元のLTX構成は廃止し、提供された `WAN 2.2 Smooth Workflow v6.0 AIO` に合わせて刷新しています。
 
-> Note: the repo is still named `wan-animate-runpod` for history; it now ships the
-> LTX-2.3 v2v stack. The image bakes only ComfyUI startup glue, custom-node
-> install, and the downloader. Models download into `/workspace/comfyui/models`
-> at boot so a persistent volume reuses them.
+## この構成でできること
 
-## Container Image
+- I2V: SmoothMix I2V v2 High/Low + 作者推奨LightX2V rank128
+- T2V: 最新SmoothMix T2V v4 High/Low（LightX2V内蔵）
+- Seamless Loop: 同一画像を先頭・末尾フレームにした専用プリセット
+- Audio: MMAudio 44k v2 + BigVGANによる同期効果音
+- Finish: RIFE補間、2倍アップスケール、H.264 MP4出力
+- Full profile: ワークフローから参照・案内されるモデル／LoRAを全自動取得
 
-GitHub Actions builds on push to `main`:
+モデルはコンテナに焼かず、初回起動時に永続ボリュームへダウンロードします。各ファイルはサイズとSHA256で検証され、途中でPodが止まってもaria2が再開します。カスタムノードは14個すべてコミット固定です。
+
+## コンテナイメージ
+
+`main` へのpushでGitHub Actionsが次を発行します。
 
 ```text
+ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
 ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
+ghcr.io/grawthings-beep/wan-animate-runpod:latest
 ```
 
-After the first build, set the GHCR package visibility to **Public**
-(Packages -> this package -> Package settings), or RunPod needs a registry secret.
+RunPodから認証なしでpullする場合、GitHubのPackages画面でこのGHCRパッケージを **Public** にしてください。
 
-## RunPod Template
+## RunPod推奨設定
 
-```text
-Type: Pod
-Compute type: Nvidia GPU
-Container image: ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
-Container disk: 40 GB
-Volume disk: 150 GB+        (GGUF 22B + Gemma 12B + VAEs are large)
-Volume mount path: /workspace
-Expose HTTP ports: 8188
-```
+| 項目 | 推奨値 |
+|---|---|
+| Template type | Pod |
+| Container image | `ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6` |
+| Container disk | 50 GB |
+| Volume disk | 250 GB（`full`用。生成物を多く残すなら300 GB） |
+| Volume mount path | `/workspace` |
+| HTTP port | `8188` |
+| GPU | A100 80GB / H100 80GB（最高品質）、L40S / RTX 6000 Ada 48GB（実用下限） |
 
-**GPU:** LTX-2.3 22B Q8 GGUF (~20 GB) + Gemma 3 12B fp8 (~12 GB) want **48 GB+
-VRAM** (A100 / H100 / L40S) to avoid heavy offload. A 24 GB card runs but will be
-slow from CPU offload — pick a bigger GPU on RunPod.
+48GBでは480×832前後のベース解像度が現実的です。80GBなら600×900付近、長めのフレーム列、MMAudioまで余裕を持って扱えます。24GBでもCPUオフロードで動く場合はありますが、高品質動画用途では非常に遅くなります。
 
-Environment variables (see `runpod-template.env.example`):
+環境変数:
 
 ```text
 PORT=8188
 LISTEN=0.0.0.0
 DOWNLOAD_MODELS=1
-RUN_DEP_CHECK=0
-HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
-MODEL_MANIFEST_URL=https://raw.githubusercontent.com/grawthings-beep/wan-animate-runpod/main/config/ltx-models.json
-COMFYUI_ARGS=--reserve-vram 2
+MODEL_PROFILE=full
+CIVITAI_API_TOKEN={{ RUNPOD_SECRET_civitai_api_token }}
+RUN_DEP_CHECK=1
+ARIA2_CONNECTIONS=16
+ARIA2_SPLITS=16
+COMFYUI_ARGS=--reserve-vram 3
 ```
 
-All model files are public on Hugging Face, so `HF_TOKEN` is optional. You can
-leave `MODEL_MANIFEST_URL` unset — the image bakes `config/ltx-models.json`.
+`full` はCivitAI上の最新T2V v4とSmoothMix LoRAも取得するため、`CIVITAI_API_TOKEN` が必須です。RunPodの **Secrets** で `civitai_api_token` を作成し、上記の形式で割り当てます。Hugging Face上の使用ファイルは公開されているため、`HF_TOKEN` は通常不要です。
 
-## Model Layout (auto-downloaded)
+`MODEL_MANIFEST_URL` は設定不要です。イメージ内に検証済みmanifestを同梱しています。
+
+## モデルプロファイル
+
+| `MODEL_PROFILE` | 内容 | 用途 |
+|---|---|---|
+| `full` | 全モデル、全案内LoRA、MMAudio、RIFE、代替GGUF | 要望どおり全部入れる既定値 |
+| `i2v-quality` | I2V High/Low、必須LightX2V、共有モデル、RIFE | I2Vだけを軽く始める |
+| `loop-quality` | `i2v-quality` と同じ | ループ動画専用 |
+| `t2v-quality` | T2V v4 High/Low、共有モデル、RIFE | T2Vだけを使う |
+
+`full` は約98GBです。モデル、ComfyUIユーザーデータ、入力、出力はすべて `/workspace` 以下に置かれ、Pod交換後も残ります。
+
+## ワークフロー
+
+初回起動後、ComfyUIの **Workflows → Open** から選べます。
+
+- `wan22_smooth_v6_aio_runpod`: I2V / T2V / First2LastFrame / Audio2VideoのAIO
+- `wan22_smooth_v6_seamless_loop_runpod`: First2LastFrameを選択済みのループ専用版
+
+I2V用Power LoRA Loaderには、作者推奨の次の設定をあらかじめ入れています。
 
 ```text
-models/unet/LTX-2.3-distilled-Q8_0.gguf
-models/text_encoders/gemma_3_12B_it_fp8_scaled.safetensors
-models/text_encoders/ltx-2.3_text_projection_bf16.safetensors
-models/vae/LTX23_video_vae_bf16.safetensors
-models/vae/LTX23_audio_vae_bf16.safetensors
-models/vae/taeltx2_3.safetensors                       (preview)
-models/latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors
-models/loras/ltx2/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors
+High noise: lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16 = 3.0
+Low noise:  lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16 = 1.5
 ```
 
-Depth/DWPose preprocessor models are auto-downloaded by `comfyui_controlnet_aux`.
+このLoRAを外すと、I2V v2はぼけ・ノイズ化しやすくなります。T2V v4にはLightX2Vが内蔵されているため、追加の加速LoRAは既定OFFです。
 
-## Custom Nodes (installed at build)
+## 高品質I2Vの始め方
 
-- `ComfyUI-LTXVideo` (LTX-2.3 sampling, IC-LoRA, AV latent, upsampler)
-- `ComfyUI-KJNodes` (GGUFLoaderKJ, VAELoaderKJ, LatentUpscaleModelLoader)
-- `ComfyUI-Impact-Pack` (conditional branch / switch nodes)
-- `ComfyUI-Easy-Use` (loraStack, math/logic helpers)
-- `comfyui_controlnet_aux` (Depth / Canny / DWPose preprocessors)
-- `ComfyUI-RMBG` (background removal)
-- `ComfyUI-VideoHelperSuite` (load/save video)
+1. AIOを開き、上部の `Worflows` スイッチで `IMAGE2VIDEO` を選択します。
+2. 入力画像とプロンプトを指定します。
+3. 最初は `480×832` または `512×896`、81 frames、Shift 8、CFG 1、High 4 steps + Low 4 stepsから試します。
+4. 動きが弱ければShiftを6へ、形状維持を優先するなら10へ寄せます。
+5. 短い生成が安定してから解像度、フレーム数、RIFE、2倍アップスケールを上げます。
 
-## Workflow
+900×600のT2V v4ショーケース設定はSteps 8、Euler、Simpleです。まず低いベース解像度で構図・動きを確定し、最後に補間とアップスケールを行う方が失敗コストを抑えられます。
 
-The LTX-2.3 v2v workflow is **bundled and auto-installed** on pod start — open it
-from `Workflow -> Open -> ltx2.3_v2v_javano2604`. All loaders are pre-wired to the
-files above. See `workflows/README.md` for the model/folder table and tips.
+## シームレスループ
 
-## Troubleshooting
+専用ワークフローを開き、`FIRST FRAME` と `LAST FRAME` の両方に **まったく同じ画像**を指定します。プロンプトは「呼吸、揺れ、回転、波、脈動」など元の状態へ戻れる周期運動にし、カット、登場・退場、一方向の移動、不可逆な変形は避けます。
 
-- **`SageAttention` import/attn error:** the main `GGUFLoaderKJ` uses `sageattn`.
-  If the base image lacks SageAttention, set that widget to `sdpa`.
-- **Slow despite "distilled":** you're offloading — use a 48 GB+ GPU, and keep the
-  step count low (distilled is built for few steps).
-- **A loader dropdown can't see a model:** ComfyUI's `models_dir` may differ from
-  the volume. Confirm the file is under `/workspace/comfyui/models/<folder>` and
-  that `<folder>` is mapped in the generated `extra_model_paths.yaml`, then
-  restart ComfyUI (it scans model folders at startup).
-- **Model re-downloads every boot:** ensure the volume is mounted at `/workspace`
-  and models live under `/workspace/comfyui/models`.
+最初は81 framesの短いループを作り、継ぎ目を確認してからRIFEとアップスケールを有効にしてください。専用版は音の継ぎ目を作らないためMMAudioを既定OFFにしています。MP4自体には無限再生指定がないため、再生側でloopを有効にします。
+
+## 永続化レイアウト
+
+```text
+/workspace/
+├── comfyui/
+│   ├── models/
+│   ├── input/
+│   ├── output/
+│   └── user/default/workflows/
+├── config/wan22-models.json
+└── .cache/
+```
+
+## ローカル検証
+
+```bash
+python scripts/prepare_workflows.py --check
+python scripts/validate_assets.py
+python -m unittest discover -s tests -v
+bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh
+```
+
+## トラブルシューティング
+
+- 起動直後にCivitAI tokenエラー: RunPod Secret名と `CIVITAI_API_TOKEN` の割り当てを確認します。
+- 黒画面・崩れた映像: 古いComfyUIで起きやすいため、このイメージの固定バージョンを使い、別の古いPodからcustom nodeを持ち込まないでください。
+- I2Vがぼける: rank128 LightX2VがHigh=3.0、Low=1.5でONか確認します。
+- モデルが表示されない: `/workspace/comfyui/models/` 以下を確認してPodを再起動します。
+- 初回起動が長い: `full` は約98GBです。ログの `DOWNLOAD:` とaria2進捗を確認してください。
+- OOM: ベース解像度、frames、RIFE batchを下げるか、80GB GPUへ上げます。

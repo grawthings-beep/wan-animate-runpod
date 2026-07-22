@@ -7,7 +7,6 @@ COMFYUI_DIR="$(find_comfyui_dir)" || {
   echo "ERROR: could not find ComfyUI main.py. Set COMFYUI_DIR explicitly." >&2
   exit 2
 }
-
 PYTHON_BIN="$(find_python_bin)" || {
   echo "ERROR: neither python nor python3 was found in PATH." >&2
   exit 2
@@ -16,28 +15,35 @@ PYTHON_BIN="$(find_python_bin)" || {
 WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace/comfyui}"
 MODEL_ROOT="${MODEL_ROOT:-${WORKSPACE_DIR}}"
 CONFIG_DIR="${CONFIG_DIR:-/workspace/config}"
-MODEL_MANIFEST="${MODEL_MANIFEST:-${CONFIG_DIR}/ltx-models.json}"
+MODEL_MANIFEST="${MODEL_MANIFEST:-${CONFIG_DIR}/wan22-models.json}"
+MODEL_PROFILE="${MODEL_PROFILE:-full}"
 PORT="${PORT:-8188}"
 LISTEN="${LISTEN:-0.0.0.0}"
 
-mkdir -p "${WORKSPACE_DIR}/input" \
-         "${WORKSPACE_DIR}/output" \
-         "${MODEL_ROOT}/models/checkpoints" \
-         "${MODEL_ROOT}/models/clip" \
-         "${MODEL_ROOT}/models/clip_vision" \
-         "${MODEL_ROOT}/models/configs" \
-         "${MODEL_ROOT}/models/controlnet" \
-         "${MODEL_ROOT}/models/diffusion_models" \
-         "${MODEL_ROOT}/models/embeddings" \
-         "${MODEL_ROOT}/models/loras/ltx2" \
-         "${MODEL_ROOT}/models/latent_upscale_models" \
-         "${MODEL_ROOT}/models/style_models" \
-         "${MODEL_ROOT}/models/text_encoders" \
-         "${MODEL_ROOT}/models/unet" \
-         "${MODEL_ROOT}/models/upscale_models" \
-         "${MODEL_ROOT}/models/vae" \
-         "${MODEL_ROOT}/models/vae_approx" \
-         "${CONFIG_DIR}"
+export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
+export TORCH_HOME="${TORCH_HOME:-/workspace/.cache/torch}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/.cache}"
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+
+mkdir -p \
+  "${WORKSPACE_DIR}/input" \
+  "${WORKSPACE_DIR}/output" \
+  "${WORKSPACE_DIR}/user/default/workflows" \
+  "${MODEL_ROOT}/models/checkpoints" \
+  "${MODEL_ROOT}/models/clip" \
+  "${MODEL_ROOT}/models/clip_vision" \
+  "${MODEL_ROOT}/models/diffusion_models" \
+  "${MODEL_ROOT}/models/embeddings" \
+  "${MODEL_ROOT}/models/loras" \
+  "${MODEL_ROOT}/models/mmaudio" \
+  "${MODEL_ROOT}/models/rife" \
+  "${MODEL_ROOT}/models/text_encoders" \
+  "${MODEL_ROOT}/models/unet" \
+  "${MODEL_ROOT}/models/upscale_models" \
+  "${MODEL_ROOT}/models/vae" \
+  "${CONFIG_DIR}" \
+  "${HF_HOME}" \
+  "${TORCH_HOME}"
 
 write_extra_model_paths() {
   local target="$1"
@@ -47,30 +53,28 @@ workspace:
   checkpoints: models/checkpoints/
   clip: models/clip/
   clip_vision: models/clip_vision/
-  configs: models/configs/
-  controlnet: models/controlnet/
   diffusion_models: models/diffusion_models/
   embeddings: models/embeddings/
   loras: models/loras/
-  latent_upscale_models: models/latent_upscale_models/
-  style_models: models/style_models/
+  mmaudio: models/mmaudio/
   text_encoders: models/text_encoders/
-  unet: models/unet/
+  unet: |
+    models/unet/
+    models/diffusion_models/
   upscale_models: models/upscale_models/
   vae: models/vae/
-  vae_approx: models/vae_approx/
 YAML
 }
 
 write_extra_model_paths "${COMFYUI_DIR}/extra_model_paths.yaml"
 write_extra_model_paths "${COMFYUI_DIR}/extra_model_paths.yml"
 
-# Install bundled workflow graphs so they appear in the ComfyUI Workflows menu.
+# Workflows and user settings live on the volume. Versioned filenames plus
+# no-clobber copying keep user edits safe across image updates.
 WORKFLOW_SRC="${WORKFLOW_SRC:-/opt/runpod-wan-animate/workflows}"
-WORKFLOW_DST="${WORKFLOW_DST:-${COMFYUI_DIR}/user/default/workflows}"
+WORKFLOW_DST="${WORKFLOW_DST:-${WORKSPACE_DIR}/user/default/workflows}"
 if compgen -G "${WORKFLOW_SRC}/*.json" > /dev/null 2>&1; then
   mkdir -p "${WORKFLOW_DST}"
-  # -n: never clobber a workflow the user edited and saved on the volume.
   cp -n "${WORKFLOW_SRC}"/*.json "${WORKFLOW_DST}/" 2>/dev/null || true
   echo "Installed bundled workflows into ${WORKFLOW_DST}"
 fi
@@ -80,8 +84,6 @@ if [[ -n "${MODEL_MANIFEST_JSON:-}" ]]; then
   printf '%s' "${MODEL_MANIFEST_JSON}" > "${MODEL_MANIFEST}"
   manifest_ready=1
 elif [[ -n "${MODEL_MANIFEST_URL:-}" ]]; then
-  # Non-fatal: a bad/stale URL (e.g. 404) must fall back to the baked manifest,
-  # not crash-loop the pod. The fetch runs inside the `if` so set -e won't kill us.
   if "${PYTHON_BIN}" - "${MODEL_MANIFEST_URL}" "${MODEL_MANIFEST}" <<'PY'
 import pathlib
 import sys
@@ -89,60 +91,81 @@ import urllib.request
 
 url, output = sys.argv[1], pathlib.Path(sys.argv[2])
 output.parent.mkdir(parents=True, exist_ok=True)
-request = urllib.request.Request(url, headers={"User-Agent": "runpod-wan-animate-template"})
+request = urllib.request.Request(url, headers={"User-Agent": "grawthings-wan22-runpod/2"})
 with urllib.request.urlopen(request, timeout=60) as response:
     output.write_bytes(response.read())
 PY
   then
     manifest_ready=1
   else
-    echo "WARN: MODEL_MANIFEST_URL fetch failed (${MODEL_MANIFEST_URL}); falling back to baked manifest." >&2
+    echo "WARN: manifest URL failed; using the manifest baked into the image." >&2
   fi
 fi
 
-if [[ "${manifest_ready}" != "1" && ! -f "${MODEL_MANIFEST}" && -f /opt/runpod-wan-animate/config/ltx-models.json ]]; then
-  cp /opt/runpod-wan-animate/config/ltx-models.json "${MODEL_MANIFEST}"
+if [[ "${manifest_ready}" != "1" && ! -f "${MODEL_MANIFEST}" ]]; then
+  cp /opt/runpod-wan-animate/config/wan22-models.json "${MODEL_MANIFEST}"
 fi
 
-# Optional: extra manifest to add more LoRAs/checkpoints without editing the base.
-if [[ -n "${EXTRA_MODEL_MANIFEST_JSON:-}" ]]; then
-  printf '%s' "${EXTRA_MODEL_MANIFEST_JSON}" > "${CONFIG_DIR}/extra-models.json"
-elif [[ -n "${EXTRA_MODEL_MANIFEST_URL:-}" ]]; then
-  "${PYTHON_BIN}" - "${EXTRA_MODEL_MANIFEST_URL}" "${CONFIG_DIR}/extra-models.json" <<'PY'
-import pathlib
-import sys
-import urllib.request
-
-url, output = sys.argv[1], pathlib.Path(sys.argv[2])
-output.parent.mkdir(parents=True, exist_ok=True)
-request = urllib.request.Request(url, headers={"User-Agent": "runpod-wan-animate-template"})
-with urllib.request.urlopen(request, timeout=60) as response:
-    output.write_bytes(response.read())
-PY
-fi
-
-if [[ "${DOWNLOAD_MODELS:-1}" == "1" && -f "${MODEL_MANIFEST}" ]]; then
+if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
   "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/download_models.py \
     --manifest "${MODEL_MANIFEST}" \
-    --root "${MODEL_ROOT}"
-  if [[ -f "${CONFIG_DIR}/extra-models.json" ]]; then
-    "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/download_models.py \
-      --manifest "${CONFIG_DIR}/extra-models.json" \
-      --root "${MODEL_ROOT}"
-  fi
+    --root "${MODEL_ROOT}" \
+    --profile "${MODEL_PROFILE}"
 else
-  echo "Skipping model downloads."
+  echo "Skipping model downloads (DOWNLOAD_MODELS=${DOWNLOAD_MODELS:-0})."
 fi
 
-if [[ "${RUN_DEP_CHECK:-0}" == "1" ]]; then
-  "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/check_env.py --comfyui-dir "${COMFYUI_DIR}" --model-root "${MODEL_ROOT}"
+# These two interpolation extensions look only inside their own repository.
+# Link their verified volume assets so they never redownload on a new pod.
+link_runtime_asset() {
+  local source="$1"
+  local target="$2"
+  if [[ -f "${source}" ]]; then
+    mkdir -p "$(dirname "${target}")"
+    ln -sfn "${source}" "${target}"
+  fi
+}
+
+link_runtime_asset \
+  "${MODEL_ROOT}/models/rife/rife49.pth" \
+  "${COMFYUI_DIR}/custom_nodes/ComfyUI-Frame-Interpolation/models/rife/rife49.pth"
+link_runtime_asset \
+  "${MODEL_ROOT}/models/rife/flownet.pkl" \
+  "${COMFYUI_DIR}/custom_nodes/ComfyUI-VFI/rife/train_log/flownet.pkl"
+
+# ComfyUI-MMAudio chooses the first mmaudio folder for its BigVGAN snapshot.
+# Ensure the base-model directory points at the persistent copy as well.
+mkdir -p "${COMFYUI_DIR}/models/mmaudio/nvidia"
+if [[ "${COMFYUI_DIR}" != "${MODEL_ROOT}" && -d "${MODEL_ROOT}/models/mmaudio/nvidia/bigvgan_v2_44khz_128band_512x" ]]; then
+  ln -sfn \
+    "${MODEL_ROOT}/models/mmaudio/nvidia/bigvgan_v2_44khz_128band_512x" \
+    "${COMFYUI_DIR}/models/mmaudio/nvidia/bigvgan_v2_44khz_128band_512x"
+fi
+
+if [[ "${RUN_DEP_CHECK:-1}" == "1" ]]; then
+  CHECK_ARGS=()
+  if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
+    CHECK_ARGS=(--strict)
+  fi
+  "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/check_env.py \
+    --manifest "${MODEL_MANIFEST}" \
+    --profile "${MODEL_PROFILE}" \
+    --model-root "${MODEL_ROOT}" \
+    "${CHECK_ARGS[@]}"
+fi
+
+read -r -a EXTRA_ARGS <<< "${COMFYUI_ARGS:---reserve-vram 3}"
+CORS_ARGS=()
+if [[ -n "${COMFYUI_CORS_ORIGIN:-}" ]]; then
+  CORS_ARGS=(--enable-cors-header "${COMFYUI_CORS_ORIGIN}")
 fi
 
 cd "${COMFYUI_DIR}"
 exec "${PYTHON_BIN}" main.py \
   --listen "${LISTEN}" \
   --port "${PORT}" \
-  --enable-cors-header "${COMFYUI_CORS_ORIGIN:-*}" \
   --input-directory "${WORKSPACE_DIR}/input" \
   --output-directory "${WORKSPACE_DIR}/output" \
-  ${COMFYUI_ARGS:-}
+  --user-directory "${WORKSPACE_DIR}/user" \
+  "${CORS_ARGS[@]}" \
+  "${EXTRA_ARGS[@]}"

@@ -22,19 +22,27 @@ while IFS='|' read -r name url ref; do
 
   if [[ ! -d "${target}/.git" ]]; then
     echo "Installing custom node ${name}"
-    git clone --depth 1 "${url}" "${target}"
+    git clone --filter=blob:none --no-checkout "${url}" "${target}"
   else
     echo "Custom node ${name} already exists"
   fi
 
   if [[ -n "${ref:-}" ]]; then
     git -C "${target}" fetch --depth 1 origin "${ref}"
-    git -C "${target}" checkout FETCH_HEAD
+    git -C "${target}" checkout --detach FETCH_HEAD
+  elif [[ ! -e "${target}/HEAD" ]]; then
+    git -C "${target}" checkout --detach origin/HEAD
   fi
 
   if [[ -f "${target}/requirements.txt" ]]; then
     echo "Installing Python requirements for ${name}"
     "${PYTHON_BIN}" -m pip install -r "${target}/requirements.txt"
+  elif [[ -f "${target}/requirements-no-cupy.txt" ]]; then
+    # Frame Interpolation's install.py guesses CUDA from library filenames and
+    # can choose the wrong CuPy wheel on newer CUDA images. RIFE itself only
+    # needs the portable requirements set.
+    echo "Installing portable Python requirements for ${name}"
+    "${PYTHON_BIN}" -m pip install -r "${target}/requirements-no-cupy.txt"
   fi
 
   if [[ -f "${target}/pyproject.toml" ]]; then
