@@ -2,6 +2,7 @@
 """Resumable, checksum-verified model provisioning for the RunPod volume."""
 
 import argparse
+import concurrent.futures
 import hashlib
 import json
 import os
@@ -12,6 +13,7 @@ import subprocess
 import sys
 import urllib.request
 import zipfile
+from urllib.parse import unquote, urlparse
 
 
 USER_AGENT = "grawthings-wan22-runpod/2"
@@ -129,12 +131,21 @@ def run_aria2(url, part, connections, splits):
         "-s",
         str(splits),
         "-k",
-        "1M",
+        "16M",
         "--continue=true",
         "--file-allocation=none",
         "--auto-file-renaming=false",
+        "--allow-overwrite=true",
+        "--max-tries=10",
+        "--retry-wait=3",
+        "--connect-timeout=30",
+        "--timeout=60",
+        "--disk-cache=64M",
         "--summary-interval=10",
         "--console-log-level=warn",
+        "--download-result=hide",
+        "--user-agent",
+        USER_AGENT,
         "-d",
         str(part.parent),
         "-o",
@@ -154,6 +165,8 @@ def run_curl(url, part):
         "--retry-delay",
         "3",
         "--retry-all-errors",
+        "--continue-at",
+        "-",
         "-A",
         USER_AGENT,
         "-o",
@@ -168,6 +181,55 @@ def run_urllib(url, part):
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=120) as response, part.open("wb") as handle:
         shutil.copyfileobj(response, handle, length=8 * 1024 * 1024)
+
+
+def parse_huggingface_url(url):
+    """Return (repo_id, revision, filename) for a Hub resolve URL."""
+    parsed = urlparse(url)
+    if parsed.hostname not in {"huggingface.co", "www.huggingface.co"}:
+        return None
+    repository, separator, remainder = parsed.path.lstrip("/").partition("/resolve/")
+    revision, filename_separator, filename = remainder.partition("/")
+    if (
+        not separator
+        or not filename_separator
+        or len(repository.split("/")) != 2
+        or not revision
+        or not filename
+    ):
+        return None
+    return unquote(repository), unquote(revision), unquote(filename)
+
+
+def materialize_cached_file(cached_path, part):
+    """Make the Hub cache blob the output without a second 10+ GB copy."""
+    source = pathlib.Path(cached_path).resolve()
+    part.parent.mkdir(parents=True, exist_ok=True)
+    part.unlink(missing_ok=True)
+    try:
+        os.link(source, part)
+        print(f"ZERO-COPY from HF cache: {part.name}")
+    except OSError:
+        # Different filesystems cannot hard-link. copyfileobj uses a large
+        # buffer and keeps the portable fallback efficient.
+        with source.open("rb") as src, part.open("wb") as dst:
+            shutil.copyfileobj(src, dst, length=16 * 1024 * 1024)
+
+
+def run_hf_xet(url, part):
+    coordinates = parse_huggingface_url(url)
+    if not coordinates:
+        raise ValueError(f"not a Hugging Face resolve URL: {url}")
+    repo_id, revision, filename = coordinates
+    from huggingface_hub import hf_hub_download
+
+    cached_path = hf_hub_download(
+        repo_id=repo_id,
+        filename=filename,
+        revision=revision,
+        token=os.environ.get("HF_TOKEN") or None,
+    )
+    materialize_cached_file(cached_path, part)
 
 
 def extract_archive(archive, destination, selector):
@@ -205,7 +267,7 @@ def extracted_ready(entry, root):
     return bool(provided) and sentinel.is_file() and all(path.is_file() for path in provided)
 
 
-def download_snapshot(entry, root, dry_run):
+def download_snapshot(entry, root, dry_run, max_workers):
     output = root / entry["path"]
     sentinel = output / ".snapshot-complete.json"
     name = entry.get("name") or entry["repo_id"]
@@ -227,6 +289,7 @@ def download_snapshot(entry, root, dry_run):
         local_dir=str(output),
         ignore_patterns=entry.get("ignore_patterns"),
         token=token,
+        max_workers=max_workers,
     )
     sentinel.write_text(
         json.dumps(
@@ -237,7 +300,15 @@ def download_snapshot(entry, root, dry_run):
     )
 
 
-def download_file(entry, root, use_aria2, connections, splits, dry_run):
+def download_file(
+    entry,
+    root,
+    use_aria2,
+    connections,
+    splits,
+    dry_run,
+    prefer_hf_xet=True,
+):
     entry = expand(entry)
     name = entry.get("name") or entry["path"]
     output = root / entry["path"]
@@ -280,12 +351,34 @@ def download_file(entry, root, use_aria2, connections, splits, dry_run):
     part = output.with_name(f"{output.name}.part")
     try:
         print(f"DOWNLOAD: {name}")
-        final_url = resolve_download_url(url, headers)
-        if use_aria2 and shutil.which("aria2c"):
+        # Preserve old aria2 partials across image upgrades. New Hub downloads
+        # use hf_xet, whose Rust backend adapts concurrency to the link.
+        use_existing_partial = part.is_file() and part.stat().st_size > 0
+        hub_coordinates = parse_huggingface_url(url)
+        if prefer_hf_xet and hub_coordinates and not use_existing_partial:
+            try:
+                print(f"HF_XET: {name}")
+                run_hf_xet(url, part)
+            except Exception as exc:
+                print(
+                    f"WARN hf_xet failed for {name}; falling back to aria2: {exc}",
+                    file=sys.stderr,
+                )
+                final_url = resolve_download_url(url, headers)
+                if use_aria2 and shutil.which("aria2c"):
+                    run_aria2(final_url, part, connections, splits)
+                elif shutil.which("curl"):
+                    run_curl(final_url, part)
+                else:
+                    run_urllib(final_url, part)
+        elif use_aria2 and shutil.which("aria2c"):
+            final_url = resolve_download_url(url, headers)
             run_aria2(final_url, part, connections, splits)
         elif shutil.which("curl"):
+            final_url = resolve_download_url(url, headers)
             run_curl(final_url, part)
         else:
+            final_url = resolve_download_url(url, headers)
             run_urllib(final_url, part)
 
         actual_size = part.stat().st_size
@@ -328,6 +421,14 @@ def selected_groups(manifest, profile):
     return set(profiles[profile].get("include_groups") or [])
 
 
+def largest_first(entries):
+    return sorted(
+        entries,
+        key=lambda item: (int(item.get("size_bytes") or 0), item.get("name") or ""),
+        reverse=True,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", required=True)
@@ -336,11 +437,20 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-aria2", action="store_true")
     parser.add_argument(
-        "--connections", type=int, default=int(os.environ.get("ARIA2_CONNECTIONS", "16"))
+        "--connections", type=int, default=int(os.environ.get("ARIA2_CONNECTIONS", "8"))
     )
     parser.add_argument(
-        "--splits", type=int, default=int(os.environ.get("ARIA2_SPLITS", "16"))
+        "--splits", type=int, default=int(os.environ.get("ARIA2_SPLITS", "8"))
     )
+    parser.add_argument(
+        "--workers", type=int, default=int(os.environ.get("DOWNLOAD_WORKERS", "4"))
+    )
+    parser.add_argument(
+        "--hf-snapshot-workers",
+        type=int,
+        default=int(os.environ.get("HF_SNAPSHOT_WORKERS", "8")),
+    )
+    parser.add_argument("--no-hf-xet", action="store_true")
     args = parser.parse_args()
 
     manifest_path = pathlib.Path(args.manifest)
@@ -369,23 +479,50 @@ def main():
             "profile prerequisites are missing:\n  - " + "\n  - ".join(env_errors)
         )
 
-    for entry in entries:
-        try:
-            if entry.get("repo_id"):
-                download_snapshot(entry, root, args.dry_run)
-            else:
-                download_file(
-                    entry,
-                    root,
-                    not args.no_aria2,
-                    args.connections,
-                    args.splits,
-                    args.dry_run,
-                )
-        except Exception as exc:
-            if entry.get("required", True):
-                raise
-            print(f"WARN optional asset failed: {entry.get('name')}: {exc}", file=sys.stderr)
+    ordered_entries = largest_first(entries)
+
+    def provision(entry):
+        if entry.get("repo_id"):
+            download_snapshot(entry, root, args.dry_run, args.hf_snapshot_workers)
+        else:
+            download_file(
+                entry,
+                root,
+                not args.no_aria2,
+                args.connections,
+                args.splits,
+                args.dry_run,
+                not args.no_hf_xet,
+            )
+
+    if args.dry_run:
+        for entry in ordered_entries:
+            provision(entry)
+        return
+
+    worker_count = max(1, min(args.workers, len(ordered_entries)))
+    print(
+        f"TRANSFER ENGINE: {worker_count} files in parallel; "
+        f"aria2={args.connections} connections/file; "
+        f"hf_xet={'off' if args.no_hf_xet else 'adaptive'}"
+    )
+    failures = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as pool:
+        futures = {pool.submit(provision, entry): entry for entry in ordered_entries}
+        for future in concurrent.futures.as_completed(futures):
+            entry = futures[future]
+            try:
+                future.result()
+            except Exception as exc:
+                name = entry.get("name") or entry.get("path")
+                if entry.get("required", True):
+                    failures.append(f"{name}: {exc}")
+                    print(f"ERROR required asset failed: {name}: {exc}", file=sys.stderr)
+                else:
+                    print(f"WARN optional asset failed: {name}: {exc}", file=sys.stderr)
+
+    if failures:
+        raise RuntimeError("required asset download failures:\n  - " + "\n  - ".join(failures))
 
 
 if __name__ == "__main__":

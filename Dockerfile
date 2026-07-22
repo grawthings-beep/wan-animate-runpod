@@ -26,6 +26,15 @@ COPY config/ /opt/runpod-wan-animate/config/
 COPY scripts/ /opt/runpod-wan-animate/scripts/
 COPY workflows/ /opt/runpod-wan-animate/workflows/
 
+# Keep the transfer stack isolated from ComfyUI's Python dependencies.  The
+# current Hugging Face client automatically uses the Rust hf_xet backend.
+RUN set -eu; \
+    PYTHON_BIN="$(command -v python || command -v python3)"; \
+    "${PYTHON_BIN}" -m pip install --no-cache-dir \
+        --target /opt/runpod-wan-animate/downloader-libs \
+        huggingface_hub==1.24.0 \
+        hf-xet==1.5.2
+
 RUN chmod +x /opt/runpod-wan-animate/scripts/*.sh \
     && /opt/runpod-wan-animate/scripts/install_custom_nodes.sh
 

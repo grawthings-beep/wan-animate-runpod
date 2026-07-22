@@ -11,7 +11,7 @@ RunPod上で **SmoothMix WAN 2.2 I2V/T2V、First-to-Last Frame、MMAudio、RIFE�
 - Finish: RIFE補間、2倍アップスケール、H.264 MP4出力
 - Full profile: ワークフローから参照・案内されるモデル／LoRAを全自動取得
 
-モデルはコンテナに焼かず、初回起動時に永続ボリュームへダウンロードします。各ファイルはサイズとSHA256で検証され、途中でPodが止まってもaria2が再開します。カスタムノードは14個すべてコミット固定です。
+モデルはコンテナに焼かず、初回起動時に永続ボリュームへダウンロードします。大きいファイルから4本を並列取得し、Hugging FaceはRust製 `hf_xet` の適応型並列転送、CivitAIはaria2の分割転送を使います。各ファイルはサイズとSHA256で検証され、途中でPodが止まってもHubキャッシュまたはaria2の `.part` から再開します。カスタムノードは14個すべてコミット固定です。
 
 ## コンテナイメージ
 
@@ -48,8 +48,10 @@ DOWNLOAD_MODELS=1
 MODEL_PROFILE=full
 CIVITAI_API_TOKEN={{ RUNPOD_SECRET_civitai_api_token }}
 RUN_DEP_CHECK=1
-ARIA2_CONNECTIONS=16
-ARIA2_SPLITS=16
+DOWNLOAD_WORKERS=4
+ARIA2_CONNECTIONS=8
+ARIA2_SPLITS=8
+HF_XET_HIGH_PERFORMANCE=1
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
@@ -66,7 +68,7 @@ COMFYUI_ARGS=--reserve-vram 3
 | `loop-quality` | `i2v-quality` と同じ | ループ動画専用 |
 | `t2v-quality` | T2V v4 High/Low、共有モデル、RIFE | T2Vだけを使う |
 
-`full` は約98GBです。モデル、ComfyUIユーザーデータ、入力、出力はすべて `/workspace` 以下に置かれ、Pod交換後も残ります。
+`full` は約98GBです。速度はRunPodホスト、永続ボリューム、Hugging Face/CivitAI側の混雑に左右されますが、4ファイルを並行し、各ファイル内も分割・適応並列化して回線の遊休時間を減らします。モデル、ComfyUIユーザーデータ、入力、出力はすべて `/workspace` 以下に置かれ、Pod交換後も残ります。
 
 ## ワークフロー
 
@@ -128,5 +130,5 @@ bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh
 - 黒画面・崩れた映像: 古いComfyUIで起きやすいため、このイメージの固定バージョンを使い、別の古いPodからcustom nodeを持ち込まないでください。
 - I2Vがぼける: rank128 LightX2VがHigh=3.0、Low=1.5でONか確認します。
 - モデルが表示されない: `/workspace/comfyui/models/` 以下を確認してPodを再起動します。
-- 初回起動が長い: `full` は約98GBです。ログの `DOWNLOAD:` とaria2進捗を確認してください。
+- 初回起動が長い: `full` は約98GBです。ログの `TRANSFER ENGINE`、`HF_XET:`、aria2進捗を確認してください。帯域制限や429が出る環境では `DOWNLOAD_WORKERS=2` に下げると安定します。
 - OOM: ベース解像度、frames、RIFE batchを下げるか、80GB GPUへ上げます。

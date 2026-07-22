@@ -58,6 +58,44 @@ class DownloadModelsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             DOWNLOAD_MODELS.selected_groups(manifest, "missing")
 
+    def test_huggingface_resolve_url_is_parsed(self):
+        self.assertEqual(
+            DOWNLOAD_MODELS.parse_huggingface_url(
+                "https://huggingface.co/org/repo/resolve/abc123/folder/model.safetensors"
+            ),
+            ("org/repo", "abc123", "folder/model.safetensors"),
+        )
+        self.assertIsNone(
+            DOWNLOAD_MODELS.parse_huggingface_url("https://civitai.com/api/download/models/1")
+        )
+        self.assertEqual(
+            DOWNLOAD_MODELS.parse_huggingface_url(
+                "https://huggingface.co/org/repo/resolve/refs%2Fpr%2F1/model.bin"
+            ),
+            ("org/repo", "refs/pr/1", "model.bin"),
+        )
+
+    def test_largest_files_are_scheduled_first(self):
+        entries = [
+            {"name": "small", "size_bytes": 1},
+            {"name": "large", "size_bytes": 100},
+            {"name": "medium", "size_bytes": 10},
+        ]
+        self.assertEqual(
+            [item["name"] for item in DOWNLOAD_MODELS.largest_first(entries)],
+            ["large", "medium", "small"],
+        )
+
+    def test_cached_file_is_materialized_without_changing_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            cached = root / "cache" / "blob"
+            cached.parent.mkdir()
+            cached.write_bytes(b"xet cache payload")
+            part = root / "models" / "model.part"
+            DOWNLOAD_MODELS.materialize_cached_file(cached, part)
+            self.assertEqual(part.read_bytes(), b"xet cache payload")
+
 
 if __name__ == "__main__":
     unittest.main()

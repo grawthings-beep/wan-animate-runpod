@@ -32,8 +32,10 @@ DOWNLOAD_MODELS=1
 MODEL_PROFILE=full
 CIVITAI_API_TOKEN={{ RUNPOD_SECRET_civitai_api_token }}
 RUN_DEP_CHECK=1
-ARIA2_CONNECTIONS=16
-ARIA2_SPLITS=16
+DOWNLOAD_WORKERS=4
+ARIA2_CONNECTIONS=8
+ARIA2_SPLITS=8
+HF_XET_HIGH_PERFORMANCE=1
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
@@ -49,7 +51,7 @@ COMFYUI_ARGS=--reserve-vram 3
 
 1. Podを起動する。
 2. Logsで `MODEL PROFILE: full`、`DOWNLOAD:`、最後の `missing=0` を確認する。
-3. 初回のみ約98GBを取得する。Podを止めても `.part` から再開する。
+3. 初回のみ約98GBを取得する。`TRANSFER ENGINE: 4 files in parallel` を確認する。Podを止めてもHFキャッシュまたは `.part` から再開する。
 4. **Connect → HTTP Service [Port 8188]** でComfyUIを開く。
 5. **Workflows → Open** からAIOまたはSeamless Loopを選ぶ。
 

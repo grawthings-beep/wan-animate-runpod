@@ -21,6 +21,11 @@ PORT="${PORT:-8188}"
 LISTEN="${LISTEN:-0.0.0.0}"
 
 export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
+export HF_XET_CACHE="${HF_XET_CACHE:-${HF_HOME}/xet}"
+# RunPod's datacenter links and SSD-backed volumes benefit from Xet's enlarged
+# buffers and adaptive concurrency. Set this to 0 only on a memory-constrained
+# pod; the downloader will still use the normal Xet engine.
+export HF_XET_HIGH_PERFORMANCE="${HF_XET_HIGH_PERFORMANCE:-1}"
 export TORCH_HOME="${TORCH_HOME:-/workspace/.cache/torch}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/.cache}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
@@ -43,6 +48,7 @@ mkdir -p \
   "${MODEL_ROOT}/models/vae" \
   "${CONFIG_DIR}" \
   "${HF_HOME}" \
+  "${HF_XET_CACHE}" \
   "${TORCH_HOME}"
 
 write_extra_model_paths() {
@@ -107,7 +113,9 @@ if [[ "${manifest_ready}" != "1" && ! -f "${MODEL_MANIFEST}" ]]; then
 fi
 
 if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
-  "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/download_models.py \
+  DOWNLOADER_LIBS="/opt/runpod-wan-animate/downloader-libs"
+  env PYTHONPATH="${DOWNLOADER_LIBS}${PYTHONPATH:+:${PYTHONPATH}}" \
+    "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/download_models.py \
     --manifest "${MODEL_MANIFEST}" \
     --root "${MODEL_ROOT}" \
     --profile "${MODEL_PROFILE}"
