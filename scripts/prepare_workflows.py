@@ -158,6 +158,7 @@ def patch_loop(aio):
         combine["loop_count"] = 0
 
     graph.setdefault("extra", {})["runpod_bundle"]["preset"] = "seamless-loop"
+    graph["extra"]["runpod_bundle"]["profile"] = "loop-quality"
     return graph
 
 

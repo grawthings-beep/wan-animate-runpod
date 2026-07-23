@@ -1,9 +1,11 @@
 import hashlib
 import importlib.util
+import os
 import pathlib
 import tempfile
 import unittest
 import zipfile
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -95,6 +97,67 @@ class DownloadModelsTests(unittest.TestCase):
             part = root / "models" / "model.part"
             DOWNLOAD_MODELS.materialize_cached_file(cached, part)
             self.assertEqual(part.read_bytes(), b"xet cache payload")
+
+    def test_auth_query_is_added_without_losing_existing_parameters(self):
+        with mock.patch.dict(os.environ, {"CIVITAI_API_TOKEN": "top secret"}):
+            url = DOWNLOAD_MODELS.add_auth_query(
+                "https://civitai.com/api/download/models/1?format=SafeTensor",
+                "CIVITAI_API_TOKEN",
+            )
+        self.assertIn("format=SafeTensor", url)
+        self.assertIn("token=top+secret", url)
+
+    def test_auth_query_is_redacted_from_logs(self):
+        url = "https://civitai.com/api/download/models/1?token=top-secret&format=SafeTensor"
+        redacted = DOWNLOAD_MODELS.redact_url(url)
+        self.assertNotIn("top-secret", redacted)
+        self.assertIn("token=REDACTED", redacted)
+
+    def test_loop_profile_includes_every_loop_branch_asset_group(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        groups = DOWNLOAD_MODELS.selected_groups(manifest, "loop-quality")
+        self.assertEqual(
+            groups,
+            {
+                "shared",
+                "i2v",
+                "lightx-extra",
+                "smoothmix-loras",
+                "audio",
+                "interpolation",
+                "alternate-gguf",
+            },
+        )
+        selected = {
+            pathlib.PurePosixPath(entry["path"]).name
+            for entry in manifest["models"]
+            if entry["group"] in groups
+        }
+        self.assertTrue(
+            {
+                "mmaudio_vae_44k_fp16.safetensors",
+                "mmaudio_synchformer_fp16.safetensors",
+                "apple_DFN5B-CLIP-ViT-H-14-384_fp16.safetensors",
+                "mmaudio_large_44k_v2_fp16.safetensors",
+                "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8H.gguf",
+            }.issubset(selected)
+        )
+
+    def test_loop_workflow_declares_compatible_profile(self):
+        import json
+
+        workflow = json.loads(
+            (ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            workflow["extra"]["runpod_bundle"]["profile"], "loop-quality"
+        )
 
 
 if __name__ == "__main__":

@@ -95,6 +95,11 @@ def validate_manifest(manifest, errors):
                 errors.append(f"{label}: invalid SHA256")
             if int(entry.get("size_bytes") or 0) <= 0:
                 errors.append(f"{label}: size_bytes must be positive")
+        auth_query_env = entry.get("auth_query_env")
+        if auth_query_env and auth_query_env not in (entry.get("requires_env") or []):
+            errors.append(
+                f"{label}: auth_query_env must also be listed in requires_env"
+            )
 
     used_groups = set()
     for profile_name, profile in profiles.items():
@@ -108,7 +113,9 @@ def validate_manifest(manifest, errors):
     return provided_basenames
 
 
-def validate_workflows(provided_basenames, installed_packs, dependencies, errors):
+def validate_workflows(
+    provided_basenames, installed_packs, dependencies, manifest_profiles, errors
+):
     core = set(dependencies.get("core_node_types") or [])
     custom = dependencies.get("custom_node_types") or {}
     if not WORKFLOW_PATHS:
@@ -117,6 +124,12 @@ def validate_workflows(provided_basenames, installed_packs, dependencies, errors
 
     for path in WORKFLOW_PATHS:
         workflow = json.loads(path.read_text(encoding="utf-8"))
+        bundle = workflow.get("extra", {}).get("runpod_bundle", {})
+        profile = bundle.get("profile")
+        if profile not in manifest_profiles:
+            errors.append(
+                f"{path.name}: unknown/missing runpod_bundle profile {profile!r}"
+            )
         for node in iter_nodes(workflow):
             node_type = str(node.get("type", ""))
             if node_type in core or UUID_TYPE.fullmatch(node_type):
@@ -146,7 +159,13 @@ def main():
     dependencies = json.loads(DEPENDENCIES_PATH.read_text(encoding="utf-8"))
     installed_packs = read_custom_node_names(errors)
     provided = validate_manifest(manifest, errors)
-    validate_workflows(provided, installed_packs, dependencies, errors)
+    validate_workflows(
+        provided,
+        installed_packs,
+        dependencies,
+        set(manifest.get("profiles") or {}),
+        errors,
+    )
 
     if errors:
         for error in errors:

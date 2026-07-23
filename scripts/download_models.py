@@ -13,7 +13,8 @@ import subprocess
 import sys
 import urllib.request
 import zipfile
-from urllib.parse import unquote, urlparse
+from urllib.error import HTTPError
+from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 
 USER_AGENT = "grawthings-wan22-runpod/2"
@@ -115,11 +116,45 @@ def valid_existing(output, expected_sha, expected_size, min_bytes):
 
 def resolve_download_url(url, headers, timeout=90):
     request = urllib.request.Request(url, headers=headers)
-    response = urllib.request.urlopen(request, timeout=timeout)
+    try:
+        response = urllib.request.urlopen(request, timeout=timeout)
+    except HTTPError as exc:
+        # Authentication query parameters must never be echoed into Pod logs.
+        raise RuntimeError(
+            f"HTTP {exc.code} while resolving {redact_url(url)}"
+        ) from None
     try:
         return response.geturl()
     finally:
         response.close()
+
+
+def add_auth_query(url, env_name, parameter="token"):
+    """Add a secret query token for download endpoints that require it.
+
+    CivitAI accepts bearer headers for most API calls, but some protected model
+    downloads require the token query parameter before redirecting to storage.
+    Only the resolved, short-lived storage URL is handed to aria2/curl.
+    """
+    if not env_name:
+        return url
+    secret = os.environ.get(str(env_name), "").strip()
+    if not secret or has_unresolved_template(secret):
+        return url
+    parsed = urlparse(url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query[str(parameter or "token")] = secret
+    return urlunparse(parsed._replace(query=urlencode(query)))
+
+
+def redact_url(url):
+    parsed = urlparse(url)
+    sensitive = {"token", "api_key", "apikey", "key", "authorization"}
+    query = [
+        (key, "REDACTED" if key.lower() in sensitive else value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+    ]
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
 def run_aria2(url, part, connections, splits):
@@ -347,6 +382,11 @@ def download_file(
     url = entry["url"]
     if has_unresolved_template(url):
         raise RuntimeError(f"unresolved environment template in URL for {name}")
+    request_url = add_auth_query(
+        url,
+        entry.get("auth_query_env"),
+        entry.get("auth_query_name", "token"),
+    )
 
     part = output.with_name(f"{output.name}.part")
     try:
@@ -364,7 +404,7 @@ def download_file(
                     f"WARN hf_xet failed for {name}; falling back to aria2: {exc}",
                     file=sys.stderr,
                 )
-                final_url = resolve_download_url(url, headers)
+                final_url = resolve_download_url(request_url, headers)
                 if use_aria2 and shutil.which("aria2c"):
                     run_aria2(final_url, part, connections, splits)
                 elif shutil.which("curl"):
@@ -372,13 +412,13 @@ def download_file(
                 else:
                     run_urllib(final_url, part)
         elif use_aria2 and shutil.which("aria2c"):
-            final_url = resolve_download_url(url, headers)
+            final_url = resolve_download_url(request_url, headers)
             run_aria2(final_url, part, connections, splits)
         elif shutil.which("curl"):
-            final_url = resolve_download_url(url, headers)
+            final_url = resolve_download_url(request_url, headers)
             run_curl(final_url, part)
         else:
-            final_url = resolve_download_url(url, headers)
+            final_url = resolve_download_url(request_url, headers)
             run_urllib(final_url, part)
 
         actual_size = part.stat().st_size

@@ -108,8 +108,12 @@ PY
   fi
 fi
 
-if [[ "${manifest_ready}" != "1" && ! -f "${MODEL_MANIFEST}" ]]; then
-  cp /opt/runpod-wan-animate/config/wan22-models.json "${MODEL_MANIFEST}"
+if [[ "${manifest_ready}" != "1" ]]; then
+  # The default manifest is image-owned configuration. Refresh it atomically on
+  # every boot so an existing network volume cannot pin a stale model profile.
+  manifest_tmp="${MODEL_MANIFEST}.tmp"
+  cp /opt/runpod-wan-animate/config/wan22-models.json "${manifest_tmp}"
+  mv -f "${manifest_tmp}" "${MODEL_MANIFEST}"
 fi
 
 if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then

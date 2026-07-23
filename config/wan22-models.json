@@ -11,8 +11,8 @@
       "include_groups": ["shared", "i2v", "interpolation"]
     },
     "loop-quality": {
-      "description": "First/last-frame loop generation; same assets as high-quality I2V.",
-      "include_groups": ["shared", "i2v", "interpolation"]
+      "description": "Complete first/last-frame loop workspace, including every model and LoRA referenced by the loop branch (MMAudio and alternate GGUF included). Only the two T2V-only checkpoints are omitted.",
+      "include_groups": ["shared", "i2v", "lightx-extra", "smoothmix-loras", "audio", "interpolation", "alternate-gguf"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -76,6 +76,7 @@
       "size_bytes": 16065804446,
       "sha256": "2407147f0a6a9272547750fa27fca3cca384a39c9261ead1bab60972fe878862",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -86,6 +87,7 @@
       "size_bytes": 16065804446,
       "sha256": "ec57fbfbb0655620d9187394611ccf1cc6e9145c105f8704d2caac2ff26a2619",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -128,6 +130,7 @@
       "size_bytes": 306807280,
       "sha256": "d71ca0a31d2d94543341243f7c974603df3ab13a57213a7f33debd35eb3e5e6a",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -138,6 +141,7 @@
       "size_bytes": 306807280,
       "sha256": "633935a4f55cfa89b95104f05ba0a7055188f3c8b2d50930260796c1c948ff83",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -148,6 +152,7 @@
       "size_bytes": 306807280,
       "sha256": "58de83787881bd07182ffe48231264b86a2ab76e1f6fa632ab20c3ea3b4414a5",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -158,6 +163,7 @@
       "size_bytes": 306807280,
       "sha256": "2ed4b8fec7462b5a4d3bb779e656dbef13655ac4cb777895d296ee20a0fcda50",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -168,6 +174,7 @@
       "size_bytes": 306807280,
       "sha256": "79c11d4da5baa77dc1f2703eef612c02674854f1246338bb823e54629c92c544",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -178,6 +185,7 @@
       "size_bytes": 306807280,
       "sha256": "31cbd0840441c29940712602cb4746e5d81b80e774602d8714fee1fcf07b19ad",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -188,6 +196,7 @@
       "size_bytes": 306807280,
       "sha256": "eac4f4341008abb00434d08fed1d4fda4a144bc94cd26b4819f629f930a75181",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
@@ -198,6 +207,7 @@
       "size_bytes": 306807280,
       "sha256": "ad50dfc46c765a6ccc36d40e8a5f77ac2db041f68266593add12ac5f5eac2d76",
       "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {

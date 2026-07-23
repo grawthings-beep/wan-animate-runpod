@@ -46,7 +46,8 @@ PORT=8188
 LISTEN=0.0.0.0
 DOWNLOAD_MODELS=1
 MODEL_PROFILE=full
-CIVITAI_API_TOKEN={{ RUNPOD_SECRET_civitai_api_token }}
+CIVITAI_API_TOKEN={{ RUNPOD_SECRET_CIVITAI_TOKEN }}
+HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
 RUN_DEP_CHECK=1
 DOWNLOAD_WORKERS=4
 ARIA2_CONNECTIONS=8
@@ -55,7 +56,7 @@ HF_XET_HIGH_PERFORMANCE=1
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
-`full` はCivitAI上の最新T2V v4とSmoothMix LoRAも取得するため、`CIVITAI_API_TOKEN` が必須です。RunPodの **Secrets** で `civitai_api_token` を作成し、上記の形式で割り当てます。Hugging Face上の使用ファイルは公開されているため、`HF_TOKEN` は通常不要です。
+`full` はCivitAI上の最新T2V v4とSmoothMix LoRAも取得するため、`CIVITAI_API_TOKEN` が必須です。この構成ではRunPod Secret名を `CIVITAI_TOKEN`、`HF_TOKEN` とし、環境変数欄の鍵アイコンからそれぞれ割り当てます。Hugging Faceのファイル自体は公開ですが、`HF_TOKEN` を渡すと匿名リクエストのレート制限を避けられます。
 
 `MODEL_MANIFEST_URL` は設定不要です。イメージ内に検証済みmanifestを同梱しています。
 
@@ -65,10 +66,10 @@ COMFYUI_ARGS=--reserve-vram 3
 |---|---|---|
 | `full` | 全モデル、全案内LoRA、MMAudio、RIFE、代替GGUF | 要望どおり全部入れる既定値 |
 | `i2v-quality` | I2V High/Low、必須LightX2V、共有モデル、RIFE | I2Vだけを軽く始める |
-| `loop-quality` | `i2v-quality` と同じ | ループ動画専用 |
+| `loop-quality` | ループ枝が参照する26資産（I2V、追加LoRA、MMAudio、RIFE、代替GGUF）。T2V専用High/Lowのみ除外 | 不足モデルなしでループを使う（約65GB） |
 | `t2v-quality` | T2V v4 High/Low、共有モデル、RIFE | T2Vだけを使う |
 
-`full` は約98GBです。速度はRunPodホスト、永続ボリューム、Hugging Face/CivitAI側の混雑に左右されますが、4ファイルを並行し、各ファイル内も分割・適応並列化して回線の遊休時間を減らします。モデル、ComfyUIユーザーデータ、入力、出力はすべて `/workspace` 以下に置かれ、Pod交換後も残ります。
+`full` は約98GB、`loop-quality` は約65GBです。速度はRunPodホスト、永続ボリューム、Hugging Face/CivitAI側の混雑に左右されますが、4ファイルを並行し、各ファイル内も分割・適応並列化して回線の遊休時間を減らします。モデル、ComfyUIユーザーデータ、入力、出力はすべて `/workspace` 以下に置かれ、Pod交換後も残ります。
 
 ## ワークフロー
 
@@ -129,6 +130,6 @@ bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh
 - 起動直後にCivitAI tokenエラー: RunPod Secret名と `CIVITAI_API_TOKEN` の割り当てを確認します。
 - 黒画面・崩れた映像: 古いComfyUIで起きやすいため、このイメージの固定バージョンを使い、別の古いPodからcustom nodeを持ち込まないでください。
 - I2Vがぼける: rank128 LightX2VがHigh=3.0、Low=1.5でONか確認します。
-- モデルが表示されない: `/workspace/comfyui/models/` 以下を確認してPodを再起動します。
+- モデルが表示されない: ログ末尾の `[check_env] ... missing=0` を確認します。新しいイメージは既存ボリューム上の古い標準manifestを起動ごとに更新します。
 - 初回起動が長い: `full` は約98GBです。ログの `TRANSFER ENGINE`、`HF_XET:`、aria2進捗を確認してください。帯域制限や429が出る環境では `DOWNLOAD_WORKERS=2` に下げると安定します。
 - OOM: ベース解像度、frames、RIFE batchを下げるか、80GB GPUへ上げます。
