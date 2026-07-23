@@ -22,6 +22,11 @@ MODEL_RENAMES = {
     "SmoothMix_T2V_Low_v4.safetensors": "smoothMixWan2214BI2V_t2vLowV40.safetensors",
 }
 
+SAMPLER_NODE_TYPES = {
+    "KSamplerAdvanced",
+    "KSamplerWithNAG (Advanced)",
+}
+
 
 def replace_model_names(value):
     if isinstance(value, str):
@@ -58,8 +63,121 @@ def configure_lora_node(node, entries):
         node["size"][1] = max(float(node["size"][1]), 190 + 48 * len(entries))
 
 
+def _top_level_link(graph, link_id):
+    return next(link for link in graph["links"] if link[0] == link_id)
+
+
+def _append_origin_link(graph, link):
+    origin = next(node for node in graph["nodes"] if node["id"] == link[1])
+    output = origin["outputs"][link[2]]
+    links = output.get("links")
+    if links is None:
+        links = []
+        output["links"] = links
+    links.append(link[0])
+
+
+def flatten_sampler_subgraphs(graph):
+    """Replace one-node sampler subgraphs with ordinary executable nodes.
+
+    ComfyUI can bypass a subgraph by forwarding its first input, even when that
+    input is MODEL and the subgraph output is LATENT. The Smooth Workflow uses
+    bypassed sampler subgraphs while switching branches, so this can feed a
+    ModelPatcherDynamic into VAEDecode. Flattening keeps the same sampler,
+    settings, and connections while restoring type-aware node bypass behavior.
+    """
+
+    definitions = graph.get("definitions", {}).get("subgraphs", [])
+    by_type = {subgraph["id"]: subgraph for subgraph in definitions}
+    flattened_types = set()
+
+    for index, instance in enumerate(list(graph["nodes"])):
+        subgraph = by_type.get(instance.get("type"))
+        if not subgraph or len(subgraph.get("nodes", [])) != 1:
+            continue
+
+        template = subgraph["nodes"][0]
+        if template.get("type") not in SAMPLER_NODE_TYPES:
+            continue
+
+        direct = copy.deepcopy(template)
+        direct["id"] = instance["id"]
+        for key in ("pos", "flags", "order", "mode", "title", "color", "bgcolor", "shape"):
+            if key in instance:
+                direct[key] = copy.deepcopy(instance[key])
+
+        for item in direct.get("inputs", []):
+            item["link"] = None
+        for item in direct.get("outputs", []):
+            item["links"] = []
+
+        internal_links = subgraph.get("links", [])
+        for boundary_slot, _boundary_input in enumerate(subgraph.get("inputs", [])):
+            external_link_id = instance["inputs"][boundary_slot].get("link")
+            targets = [
+                link
+                for link in internal_links
+                if link["origin_id"] == -10 and link["origin_slot"] == boundary_slot
+            ]
+            for target_index, target in enumerate(targets):
+                if external_link_id is None:
+                    continue
+                if target_index == 0:
+                    link_id = external_link_id
+                    top_link = _top_level_link(graph, link_id)
+                    top_link[3] = instance["id"]
+                    top_link[4] = target["target_slot"]
+                else:
+                    graph["last_link_id"] += 1
+                    link_id = graph["last_link_id"]
+                    source = _top_level_link(graph, external_link_id)
+                    top_link = [
+                        link_id,
+                        source[1],
+                        source[2],
+                        instance["id"],
+                        target["target_slot"],
+                        target["type"],
+                    ]
+                    graph["links"].append(top_link)
+                    _append_origin_link(graph, top_link)
+                direct["inputs"][target["target_slot"]]["link"] = link_id
+
+        for boundary_slot, boundary_output in enumerate(subgraph.get("outputs", [])):
+            sources = [
+                link
+                for link in internal_links
+                if link["target_id"] == -20 and link["target_slot"] == boundary_slot
+            ]
+            if len(sources) != 1:
+                raise ValueError(
+                    f"sampler subgraph {subgraph['id']} output {boundary_slot} "
+                    f"has {len(sources)} internal sources"
+                )
+            source_slot = sources[0]["origin_slot"]
+            external_ids = instance["outputs"][boundary_slot].get("links") or []
+            direct["outputs"][source_slot]["links"].extend(external_ids)
+            for link_id in external_ids:
+                top_link = _top_level_link(graph, link_id)
+                top_link[1] = instance["id"]
+                top_link[2] = source_slot
+
+        graph["nodes"][index] = direct
+        flattened_types.add(subgraph["id"])
+
+    if flattened_types:
+        referenced_types = {node.get("type") for node in graph["nodes"]}
+        graph["definitions"]["subgraphs"] = [
+            subgraph
+            for subgraph in definitions
+            if subgraph["id"] in referenced_types
+        ]
+    return graph
+
+
 def patch_aio(graph):
     graph = replace_model_names(graph)
+    graph = flatten_sampler_subgraphs(graph)
     by_id = {node["id"]: node for node in graph["nodes"]}
 
     i2v_high = [
