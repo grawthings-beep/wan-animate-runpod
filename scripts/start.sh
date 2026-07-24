@@ -26,6 +26,8 @@ export HF_XET_CACHE="${HF_XET_CACHE:-${HF_HOME}/xet}"
 # buffers and adaptive concurrency. Set this to 0 only on a memory-constrained
 # pod; the downloader will still use the normal Xet engine.
 export HF_XET_HIGH_PERFORMANCE="${HF_XET_HIGH_PERFORMANCE:-1}"
+export HF_XET_NUM_CONCURRENT_RANGE_GETS="${HF_XET_NUM_CONCURRENT_RANGE_GETS:-64}"
+export HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-300}"
 export TORCH_HOME="${TORCH_HOME:-/workspace/.cache/torch}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/.cache}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
@@ -159,6 +161,9 @@ link_runtime_asset \
 link_runtime_asset \
   "${MODEL_ROOT}/models/rife/flownet.pkl" \
   "${COMFYUI_DIR}/custom_nodes/ComfyUI-VFI/rife/train_log/flownet.pkl"
+link_runtime_asset \
+  "${MODEL_ROOT}/models/rife/rife49.pth" \
+  "${COMFYUI_DIR}/custom_nodes/ComfyUI_Fill-Nodes/nodes/cache/rife_models/rife49.pth"
 
 # ComfyUI-MMAudio chooses the first mmaudio folder for its BigVGAN snapshot.
 # Ensure the base-model directory points at the persistent copy as well.

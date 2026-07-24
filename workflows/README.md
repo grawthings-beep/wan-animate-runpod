@@ -1,14 +1,15 @@
 # Workflows
 
-- `wan22_smooth_v6_aio_runpod.json`: I2V / T2V / First2LastFrame / Audio2Videoの全機能版。
-- `wan22_smooth_v6_seamless_loop_runpod.json`: First2LastFrameを有効化し、音声を無効化したシームレスループ版。
-- `source/WAN 2.2 Smooth Workflow v6.0.json`: ユーザー提供の未加工ソース。
+- `wan22_native_enhanced_lightning_longvideo_runpod.json`: 5〜20秒の連続I2V、RIFE、upscaleを含む今回のworkflow
+- `wan22_smooth_v6_aio_runpod.json`: Smooth v6のI2V / T2V / First-to-Last Frame / Audio2Video
+- `wan22_smooth_v6_seamless_loop_runpod.json`: Smooth v6のシームレスループpreset
+- `source/*.json`: ユーザー提供の未加工source
 
-生成版は `scripts/prepare_workflows.py` で作ります。モデルの実ファイル名、I2V LightX2V High=3.0 / Low=1.5、RunPod用メタデータを決定的に適用しています。
+生成物は`scripts/prepare_workflows.py`で決定的に作ります。配布モデル名への正規化、古い絶対パスとvideo preview metadataの削除、任意LoRA表示、RunPod profile metadataの追加を行います。
 
 ```bash
 python scripts/prepare_workflows.py
 python scripts/prepare_workflows.py --check
 ```
 
-Pod起動時にトップレベルの生成版JSONだけが `/workspace/comfyui/user/default/workflows/` へコピーされます。既存のユーザー編集は上書きしません。
+起動時、生成済みの`*_runpod.json`だけが`/workspace/comfyui/user/default/workflows/`へ入ります。既存のユーザー編集版は上書きせず、bundle内容が変わった場合はhash付きの新ファイルを追加します。

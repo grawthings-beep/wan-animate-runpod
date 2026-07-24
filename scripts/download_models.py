@@ -17,7 +17,7 @@ from urllib.error import HTTPError
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 
-USER_AGENT = "grawthings-wan22-runpod/2"
+USER_AGENT = "grawthings-wan22-runpod/3"
 
 
 def expand(value):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build deterministic RunPod-ready AIO and seamless-loop workflow files."""
+"""Build deterministic RunPod-ready WAN 2.2 workflow files."""
 
 import argparse
 import copy
@@ -9,10 +9,23 @@ import sys
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "workflows" / "source" / "WAN 2.2 Smooth Workflow v6.0.json"
+SMOOTH_SOURCE = (
+    ROOT / "workflows" / "source" / "WAN 2.2 Smooth Workflow v6.0.json"
+)
+LIGHTNING_SOURCE = (
+    ROOT
+    / "workflows"
+    / "source"
+    / "WAN 2.2 Native Enhanced Lightning Long Video.json"
+)
 OUTPUTS = {
     "aio": ROOT / "workflows" / "wan22_smooth_v6_aio_runpod.json",
     "loop": ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json",
+    "lightning": (
+        ROOT
+        / "workflows"
+        / "wan22_native_enhanced_lightning_longvideo_runpod.json"
+    ),
 }
 
 MODEL_RENAMES = {
@@ -20,6 +33,20 @@ MODEL_RENAMES = {
     "SmoothMix_I2V_v2_Low.safetensors": "smoothMixWan2214BI2V_i2vV20Low.safetensors",
     "SmoothMix_T2V_High_v4.safetensors": "smoothMixWan2214BI2V_t2vHighV40.safetensors",
     "SmoothMix_T2V_Low_v4.safetensors": "smoothMixWan2214BI2V_t2vLowV40.safetensors",
+    (
+        "wan2.2\\wan22EnhancedNSFWCameraPrompt_"
+        "nsfwFASTMOVEV2FP8H.safetensors"
+    ): "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
+    (
+        "wan2.2\\wan22EnhancedNSFWCameraPrompt_"
+        "nsfwFASTMOVEV2FP8L.safetensors"
+    ): "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
+    (
+        "wan2.2\\Wan2_2-I2V-A14B-HIGH_Q8_(lightning edition)V1.1.gguf"
+    ): "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8H.gguf",
+    (
+        "wan2.2\\Wan2_2-I2V-A14B-LOW_Q8_(lightning edition)V1.1.gguf"
+    ): "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8L.gguf",
 }
 
 SAMPLER_NODE_TYPES = {
@@ -280,6 +307,77 @@ def patch_loop(aio):
     return graph
 
 
+def patch_lightning(graph):
+    graph = replace_model_names(graph)
+
+    # Loader metadata in the source points at generic official Wan files, while
+    # the actual widgets select the author's Enhanced Lightning checkpoints.
+    # Remove that stale Manager metadata so ComfyUI cannot offer the wrong
+    # 28-GB pair as a supposed fix for a missing model.
+    for node in graph.get("nodes", []):
+        properties = node.get("properties")
+        if isinstance(properties, dict):
+            properties.pop("models", None)
+
+    high_loras = [
+        lora(
+            "SVI_v2_PRO_Wan2.2-I2V-A14B_HIGH_lora_rank_128_fp16.safetensors",
+            1.0,
+        ),
+        lora(
+            "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+            3.0,
+        ),
+        lora(
+            "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors",
+            1.0,
+        ),
+    ]
+    low_loras = [
+        lora(
+            "SVI_v2_PRO_Wan2.2-I2V-A14B_LOW_lora_rank_128_fp16.safetensors",
+            1.0,
+        ),
+        lora(
+            "Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors",
+            1.0,
+        ),
+        lora(
+            "wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors",
+            1.0,
+        ),
+    ]
+    for node in graph.get("nodes", []):
+        if node.get("type") != "Power Lora Loader (rgthree)":
+            continue
+        title = str(node.get("title", "")).upper()
+        configure_lora_node(
+            node,
+            copy.deepcopy(high_loras if "HIGH" in title else low_loras),
+        )
+
+    by_id = {node["id"]: node for node in graph.get("nodes", [])}
+    note = by_id.get(301)
+    if note and isinstance(note.get("widgets_values"), list):
+        note["widgets_values"][0] = (
+            "# RUNPOD BUNDLE\n\n"
+            "Use `MODEL_PROFILE=lightning-longvideo`. The selected Enhanced "
+            "V2 checkpoint already includes Lightning. All optional LoRAs below "
+            "are downloaded but intentionally OFF; do not stack another "
+            "Lightning LoRA unless you deliberately want to retune motion.\n\n"
+            + str(note["widgets_values"][0])
+        )
+
+    graph.setdefault("extra", {})["runpod_bundle"] = {
+        "profile": "lightning-longvideo",
+        "model_manifest": "config/wan22-models.json",
+        "source": "WAN 2.2 Native Enhanced Lightning long-video",
+        "checkpoint": "Enhanced FAST MOVE V2 Lightning included",
+        "requires_all_referenced_assets": True,
+    }
+    return graph
+
+
 def encode(graph):
     return (
         json.dumps(graph, ensure_ascii=False, separators=(",", ":"), sort_keys=False)
@@ -292,9 +390,16 @@ def main():
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
-    source = json.loads(SOURCE.read_text(encoding="utf-8-sig"))
-    aio = patch_aio(source)
-    generated = {"aio": encode(aio), "loop": encode(patch_loop(aio))}
+    smooth_source = json.loads(SMOOTH_SOURCE.read_text(encoding="utf-8-sig"))
+    lightning_source = json.loads(
+        LIGHTNING_SOURCE.read_text(encoding="utf-8-sig")
+    )
+    aio = patch_aio(smooth_source)
+    generated = {
+        "aio": encode(aio),
+        "loop": encode(patch_loop(aio)),
+        "lightning": encode(patch_lightning(lightning_source)),
+    }
 
     changed = []
     for name, path in OUTPUTS.items():

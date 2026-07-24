@@ -66,6 +66,7 @@ def validate_manifest(manifest, errors):
     names = set()
     groups = set()
     provided_basenames = set()
+    basename_groups = {}
     for index, entry in enumerate(manifest.get("models", [])):
         label = f"manifest models[{index}]"
         path = entry.get("path", "")
@@ -81,8 +82,10 @@ def validate_manifest(manifest, errors):
         names.add(name)
         groups.add(group)
         provided_basenames.add(pathlib.PurePosixPath(path).name)
+        basename_groups[pathlib.PurePosixPath(path).name] = group
         for provided in entry.get("provides", []):
             provided_basenames.add(pathlib.PurePosixPath(provided).name)
+            basename_groups[pathlib.PurePosixPath(provided).name] = group
 
         if entry.get("repo_id"):
             if not entry.get("revision"):
@@ -110,11 +113,16 @@ def validate_manifest(manifest, errors):
         used_groups.update(included)
     if groups - used_groups:
         errors.append(f"manifest groups unused by every profile: {sorted(groups - used_groups)}")
-    return provided_basenames
+    return provided_basenames, basename_groups
 
 
 def validate_workflows(
-    provided_basenames, installed_packs, dependencies, manifest_profiles, errors
+    provided_basenames,
+    basename_groups,
+    installed_packs,
+    dependencies,
+    manifest_profiles,
+    errors,
 ):
     core = set(dependencies.get("core_node_types") or [])
     custom = dependencies.get("custom_node_types") or {}
@@ -148,6 +156,20 @@ def validate_workflows(
         missing = referenced - provided_basenames
         if missing:
             errors.append(f"{path.name}: models absent from manifest: {sorted(missing)}")
+        if bundle.get("requires_all_referenced_assets") and profile in manifest_profiles:
+            profile_groups = set(
+                manifest_profiles[profile].get("include_groups") or []
+            )
+            outside_profile = {
+                name
+                for name in referenced
+                if basename_groups.get(name) not in profile_groups
+            }
+            if outside_profile:
+                errors.append(
+                    f"{path.name}: models absent from profile {profile}: "
+                    f"{sorted(outside_profile)}"
+                )
         raw = path.read_text(encoding="utf-8")
         if re.search(r"[A-Za-z]:\\\\", raw):
             errors.append(f"{path.name}: contains a stale Windows absolute path")
@@ -158,12 +180,13 @@ def main():
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     dependencies = json.loads(DEPENDENCIES_PATH.read_text(encoding="utf-8"))
     installed_packs = read_custom_node_names(errors)
-    provided = validate_manifest(manifest, errors)
+    provided, basename_groups = validate_manifest(manifest, errors)
     validate_workflows(
         provided,
+        basename_groups,
         installed_packs,
         dependencies,
-        set(manifest.get("profiles") or {}),
+        manifest.get("profiles") or {},
         errors,
     )
 

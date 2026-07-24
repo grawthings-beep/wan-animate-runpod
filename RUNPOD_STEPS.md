@@ -1,62 +1,88 @@
 # RunPodテンプレート設定
 
-## 1. GitHub側
+## 1. Secrets
 
-1. `main` のGitHub Actions `Build GHCR image` が成功していることを確認する。
-2. GitHubの **Packages → wan-animate-runpod → Package settings** を開く。
-3. RunPodから認証なしで使うならvisibilityを **Public** にする。
+RunPod ConsoleのSecretsで次を作ります。
 
-## 2. tokenをRunPod Secretに登録
+```text
+CIVITAI_TOKEN = CivitAI API tokenの実値
+HF_TOKEN       = Hugging Face read tokenの実値
+```
 
-1. CivitAIでAPI tokenを発行する。
-2. RunPod Consoleの **Secrets** で `CIVITAI_TOKEN` を作る。
-3. Hugging Face read tokenをSecret `HF_TOKEN` として作る。
-4. tokenを平文の環境変数へ直接貼らない。
+Templateの環境変数では鍵アイコンを押し、次のように割り当てます。
 
-## 3. Pod Template
+```text
+CIVITAI_API_TOKEN -> CIVITAI_TOKEN
+HF_TOKEN           -> HF_TOKEN
+```
+
+tokenの実値を平文のEnvironment variablesへ貼らないでください。
+
+## 2. Template
 
 ```text
 Template type: Pod
-Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
+Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-lightning-longvideo
 Container disk: 50 GB
-Volume disk: 250 GB以上
+Volume disk: 200 GB以上（fullも保持するなら300 GB推奨）
 Volume mount path: /workspace
-Expose HTTP port: 8188
 ```
 
-環境変数:
+Networking configuration:
+
+```text
+HTTP Port label: ComfyUI
+HTTP Port number: 8188
+TCP Ports: 空欄
+```
+
+Environment variables:
 
 ```text
 PORT=8188
 LISTEN=0.0.0.0
 DOWNLOAD_MODELS=1
-MODEL_PROFILE=full
+MODEL_PROFILE=lightning-longvideo
 CIVITAI_API_TOKEN={{ RUNPOD_SECRET_CIVITAI_TOKEN }}
 HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
 RUN_DEP_CHECK=1
 DOWNLOAD_WORKERS=4
-ARIA2_CONNECTIONS=8
-ARIA2_SPLITS=8
+ARIA2_CONNECTIONS=16
+ARIA2_SPLITS=16
+HF_SNAPSHOT_WORKERS=8
 HF_XET_HIGH_PERFORMANCE=1
+HF_XET_NUM_CONCURRENT_RANGE_GETS=64
+HF_HUB_DOWNLOAD_TIMEOUT=300
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
-Web画面では `CIVITAI_API_TOKEN` の値で鍵アイコンから `CIVITAI_TOKEN`、`HF_TOKEN` の値で鍵アイコンから `HF_TOKEN` を選びます。`MODEL_MANIFEST_URL` は追加しません。
+RunPod UIではSecretを選ぶと表示形式が多少違う場合があります。重要なのは左側の環境変数名が`CIVITAI_API_TOKEN`/`HF_TOKEN`で、値が対応するSecretになっていることです。
 
-## 4. GPU
+## 3. GPU
 
-- 最高品質: A100 80GB / H100 80GB
-- 実用ライン: L40S / RTX 6000 Ada 48GB
-- 24GB: CPUオフロードが増え、高解像度動画では非推奨
+- 第一候補: H100 80GB
+- コスパ: A100 80GB
+- 実用下限: L40SまたはRTX 6000 Ada 48GB
 
-## 5. 初回起動
+Native Enhanced Lightningは既定で832×480、81 framesです。48GBでは5秒セクションを順番に実行し、RIFE/upscaleを最後に有効化します。
 
-1. Podを起動する。
-2. Logsで `MODEL PROFILE: full`（ループ専用なら `loop-quality`）、`DOWNLOAD:`、最後の `missing=0` を確認する。
-3. 初回のみ約98GBを取得する。`TRANSFER ENGINE: 4 files in parallel` を確認する。Podを止めてもHFキャッシュまたは `.part` から再開する。
-4. **Connect → HTTP Service [Port 8188]** でComfyUIを開く。
-5. **Workflows → Open** からAIOまたはSeamless Loopを選ぶ。
+## 4. 初回起動
+
+Logsで次を確認します。
+
+```text
+MODEL PROFILE: lightning-longvideo (14 assets)
+TRANSFER ENGINE: 4 files in parallel
+...
+[check_env] profile=lightning-longvideo assets=14 missing=0
+```
+
+初回は約72.39 GBです。途中でPodを停止しても、同じVolumeならHF cacheまたは`.part`から再開します。`missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
+
+## 5. workflowを開く
+
+Workflowsから`wan22_native_enhanced_lightning_longvideo_runpod`を開きます。最初は5秒だけ生成し、結果が良ければ10秒、15秒、20秒のgroupを順に有効化してください。
 
 ## 6. 更新
 
-新しいGitHub Actionsビルド後にPodを再作成しても、`/workspace` のモデル、入力、出力、ユーザーワークフローは残ります。同名のユーザーワークフローは上書きしません。標準のモデルmanifestだけは新イメージの検証済み版へ自動更新されます。
+新しいGitHub Actions buildが成功した後にPodを作り直します。`/workspace`のモデル、input、output、ユーザーworkflowはVolumeに残ります。bundle workflowが更新された場合も既存版を上書きせず、hash付きの新しい版が追加されます。

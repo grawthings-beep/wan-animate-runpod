@@ -1,43 +1,35 @@
-# WAN 2.2 Smooth Workflow v6.0 on RunPod
+# WAN 2.2 ComfyUI on RunPod
 
-RunPod上で **SmoothMix WAN 2.2 I2V/T2V、First-to-Last Frame、MMAudio、RIFE補間**を動かすためのComfyUIイメージです。元のLTX構成は廃止し、提供された `WAN 2.2 Smooth Workflow v6.0 AIO` に合わせて刷新しています。
+RunPodで次の2系統をそのまま開けるComfyUIイメージです。
 
-## この構成でできること
+- Smooth Workflow v6.0: I2V / T2V / First-to-Last Frame / MMAudio / シームレスループ
+- Native Enhanced Lightning Long Video: 5〜20秒の連続I2V、RIFE 60fps化、2倍アップスケール
 
-- I2V: SmoothMix I2V v2 High/Low + 作者推奨LightX2V rank128
-- T2V: 最新SmoothMix T2V v4 High/Low（LightX2V内蔵）
-- Seamless Loop: 同一画像を先頭・末尾フレームにした専用プリセット
-- Audio: MMAudio 44k v2 + BigVGANによる同期効果音
-- Finish: RIFE補間、2倍アップスケール、H.264 MP4出力
-- Full profile: ワークフローから参照・案内されるモデル／LoRAを全自動取得
-
-モデルはコンテナに焼かず、初回起動時に永続ボリュームへダウンロードします。大きいファイルから4本を並列取得し、Hugging FaceはRust製 `hf_xet` の適応型並列転送、CivitAIはaria2の分割転送を使います。各ファイルはサイズとSHA256で検証され、途中でPodが止まってもHubキャッシュまたはaria2の `.part` から再開します。カスタムノードは14個すべてコミット固定です。
+ワークフロー、18個のcustom-node pack、モデル/LoRA manifestを同じcommitで固定しています。初回起動時だけ永続Volumeへモデルを取得し、以後は検証済みファイルと途中ダウンロードを再利用します。
 
 ## コンテナイメージ
 
-`main` へのpushでGitHub Actionsが次を発行します。
+`main`へのpushでGitHub Actionsが次を公開します。
 
 ```text
 ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
+ghcr.io/grawthings-beep/wan-animate-runpod:wan22-lightning-longvideo
 ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
 ghcr.io/grawthings-beep/wan-animate-runpod:latest
 ```
 
-RunPodから認証なしでpullする場合、GitHubのPackages画面でこのGHCRパッケージを **Public** にしてください。
+RunPodから認証なしでpullする場合、GitHub PackagesでパッケージをPublicにしてください。
 
-## RunPod推奨設定
+## Lightning長尺ワークフローのRunPod設定
 
-| 項目 | 推奨値 |
-|---|---|
-| Template type | Pod |
-| Container image | `ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6` |
-| Container disk | 50 GB |
-| Volume disk | 250 GB（`full`用。生成物を多く残すなら300 GB） |
-| Volume mount path | `/workspace` |
-| HTTP port | `8188` |
-| GPU | A100 80GB / H100 80GB（最高品質）、L40S / RTX 6000 Ada 48GB（実用下限） |
-
-48GBでは480×832前後のベース解像度が現実的です。80GBなら600×900付近、長めのフレーム列、MMAudioまで余裕を持って扱えます。24GBでもCPUオフロードで動く場合はありますが、高品質動画用途では非常に遅くなります。
+```text
+Template type: Pod
+Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-lightning-longvideo
+Container disk: 50 GB
+Volume disk: 200 GB以上（全profileを残すなら300 GB推奨）
+Volume mount path: /workspace
+HTTP port: 8188
+```
 
 環境変数:
 
@@ -45,63 +37,69 @@ RunPodから認証なしでpullする場合、GitHubのPackages画面でこのGH
 PORT=8188
 LISTEN=0.0.0.0
 DOWNLOAD_MODELS=1
-MODEL_PROFILE=full
+MODEL_PROFILE=lightning-longvideo
 CIVITAI_API_TOKEN={{ RUNPOD_SECRET_CIVITAI_TOKEN }}
 HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
 RUN_DEP_CHECK=1
 DOWNLOAD_WORKERS=4
-ARIA2_CONNECTIONS=8
-ARIA2_SPLITS=8
+ARIA2_CONNECTIONS=16
+ARIA2_SPLITS=16
+HF_SNAPSHOT_WORKERS=8
 HF_XET_HIGH_PERFORMANCE=1
+HF_XET_NUM_CONCURRENT_RANGE_GETS=64
+HF_HUB_DOWNLOAD_TIMEOUT=300
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
-`full` はCivitAI上の最新T2V v4とSmoothMix LoRAも取得するため、`CIVITAI_API_TOKEN` が必須です。この構成ではRunPod Secret名を `CIVITAI_TOKEN`、`HF_TOKEN` とし、環境変数欄の鍵アイコンからそれぞれ割り当てます。Hugging Faceのファイル自体は公開ですが、`HF_TOKEN` を渡すと匿名リクエストのレート制限を避けられます。
+`CIVITAI_API_TOKEN`と`HF_TOKEN`は平文入力ではなく、RunPod Secretsの鍵アイコンから割り当てます。HTTP portはNetworking configurationに`8188`を追加し、`PORT`/`LISTEN`は上記の環境変数にも残します。
 
-`MODEL_MANIFEST_URL` は設定不要です。イメージ内に検証済みmanifestを同梱しています。
+## 高速ダウンロード
 
-## モデルプロファイル
+`lightning-longvideo`は14 assets、約72.39 GB（67.42 GiB）です。4本をサイズ順に並列取得します。
 
-| `MODEL_PROFILE` | 内容 | 用途 |
-|---|---|---|
-| `full` | 全モデル、全案内LoRA、MMAudio、RIFE、代替GGUF | 要望どおり全部入れる既定値 |
-| `i2v-quality` | I2V High/Low、必須LightX2V、共有モデル、RIFE | I2Vだけを軽く始める |
-| `loop-quality` | ループ枝が参照する26資産（I2V、追加LoRA、MMAudio、RIFE、代替GGUF）。T2V専用High/Lowのみ除外 | 不足モデルなしでループを使う（約65GB） |
-| `t2v-quality` | T2V v4 High/Low、共有モデル、RIFE | T2Vだけを使う |
+- Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
+- CivitAI: 実URL解決後にaria2の16分割転送
+- 再開: HF cacheとaria2の`.part`を永続Volumeに保持
+- 完全性: 公開元のsizeとSHA256を全単一ファイルで検証
 
-`full` は約98GB、`loop-quality` は約65GBです。速度はRunPodホスト、永続ボリューム、Hugging Face/CivitAI側の混雑に左右されますが、4ファイルを並行し、各ファイル内も分割・適応並列化して回線の遊休時間を減らします。モデル、ComfyUIユーザーデータ、入力、出力はすべて `/workspace` 以下に置かれ、Pod交換後も残ります。
+Podを止めても`/workspace`を残せば、次回は完成済みファイルを再取得しません。429や帯域制限が出る環境だけ`DOWNLOAD_WORKERS=2`へ下げてください。
+
+## モデルprofile
+
+| `MODEL_PROFILE` | Assets | 容量 | 用途 |
+|---|---:|---:|---|
+| `lightning-longvideo` | 14 | 72.39 GB | 今回のNative Enhanced Lightning。FP8/Q8両方、全候補LoRA、RIFE、upscaler |
+| `i2v-quality` | 8 | 39.12 GB | Smooth v6のI2V |
+| `loop-quality` | 26 | 64.70 GB | Smooth v6のシームレスループ |
+| `t2v-quality` | 7 | 40.68 GB | Smooth v6のT2V |
+| `full` | 36 | 144.22 GB | 両ワークフローの全asset |
+
+LightningワークフローのQ8 High/Lowが既定の実行経路です。FP8 High/Lowも代替用として同じprofileで取得します。Enhanced V2 checkpointにはLightningが焼き込み済みなので、ワークフローへ表示した追加LoRAはすべてOFFにしてあります。
 
 ## ワークフロー
 
-初回起動後、ComfyUIの **Workflows → Open** から選べます。
+初回起動後、ComfyUIのWorkflowsから選べます。
 
-- `wan22_smooth_v6_aio_runpod`: I2V / T2V / First2LastFrame / Audio2VideoのAIO
-- `wan22_smooth_v6_seamless_loop_runpod`: First2LastFrameを選択済みのループ専用版
+- `wan22_native_enhanced_lightning_longvideo_runpod`
+- `wan22_smooth_v6_aio_runpod`
+- `wan22_smooth_v6_seamless_loop_runpod`
 
-I2V用Power LoRA Loaderには、作者推奨の次の設定をあらかじめ入れています。
+Lightning版の流れ:
 
-```text
-High noise: lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16 = 3.0
-Low noise:  lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16 = 1.5
-```
+1. Load Imageを自分の開始画像に差し替える。
+2. まず最初の5秒セクションだけを生成し、seedとpromptを固める。
+3. 気に入ったら次の10/15/20秒セクションを順に有効化する。
+4. 最後にRIFE 60fpsまたはupscale groupを必要なときだけ有効化する。
 
-このLoRAを外すと、I2V v2はぼけ・ノイズ化しやすくなります。T2V v4にはLightX2Vが内蔵されているため、追加の加速LoRAは既定OFFです。
+各セクションの`initial_reference_image`には最初の画像が渡され、`previous_video`の末尾フレームから続きます。`motion_amplitude=1.15`を基準にし、遅ければ1.2〜1.3へ上げます。色ずれは`color_protect=True`、`correct_strength=0.01〜0.05`から調整します。
 
-## 高品質I2Vの始め方
+## GPU
 
-1. AIOを開き、上部の `Worflows` スイッチで `IMAGE2VIDEO` を選択します。
-2. 入力画像とプロンプトを指定します。
-3. 最初は `480×832` または `512×896`、81 frames、Shift 8、CFG 1、High 4 steps + Low 4 stepsから試します。
-4. 動きが弱ければShiftを6へ、形状維持を優先するなら10へ寄せます。
-5. 短い生成が安定してから解像度、フレーム数、RIFE、2倍アップスケールを上げます。
+- 推奨: H100 80GB / A100 80GB
+- 実用: L40S / RTX 6000 Ada 48GB（832×480、81 framesを基準）
+- 24GB: 動く場合はありますが長尺・RIFE・upscale用途には非推奨
 
-900×600のT2V v4ショーケース設定はSteps 8、Euler、Simpleです。まず低いベース解像度で構図・動きを確定し、最後に補間とアップスケールを行う方が失敗コストを抑えられます。
-
-## シームレスループ
-
-専用ワークフローを開き、`FIRST FRAME` と `LAST FRAME` の両方に **まったく同じ画像**を指定します。プロンプトは「呼吸、揺れ、回転、波、脈動」など元の状態へ戻れる周期運動にし、カット、登場・退場、一方向の移動、不可逆な変形は避けます。
-
-最初は81 framesの短いループを作り、継ぎ目を確認してからRIFEとアップスケールを有効にしてください。専用版は音の継ぎ目を作らないためMMAudioを既定OFFにしています。MP4自体には無限再生指定がないため、再生側でloopを有効にします。
+長尺4セクションを一度に走らせず、5秒ごとに結果を確認してください。RIFEとupscaleは生成が完成してから有効化する方がVRAMと時間を無駄にしません。
 
 ## 永続化レイアウト
 
@@ -125,11 +123,4 @@ python -m unittest discover -s tests -v
 bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh
 ```
 
-## トラブルシューティング
-
-- 起動直後にCivitAI tokenエラー: RunPod Secret名と `CIVITAI_API_TOKEN` の割り当てを確認します。
-- 黒画面・崩れた映像: 古いComfyUIで起きやすいため、このイメージの固定バージョンを使い、別の古いPodからcustom nodeを持ち込まないでください。
-- I2Vがぼける: rank128 LightX2VがHigh=3.0、Low=1.5でONか確認します。
-- モデルが表示されない: ログ末尾の `[check_env] ... missing=0` を確認します。新しいイメージは既存ボリューム上の古い標準manifestを起動ごとに更新します。
-- 初回起動が長い: `full` は約98GBです。ログの `TRANSFER ENGINE`、`HF_XET:`、aria2進捗を確認してください。帯域制限や429が出る環境では `DOWNLOAD_WORKERS=2` に下げると安定します。
-- OOM: ベース解像度、frames、RIFE batchを下げるか、80GB GPUへ上げます。
+詳しいRunPod画面の入力値は[RUNPOD_STEPS.md](RUNPOD_STEPS.md)、全環境変数は[runpod-template.env.example](runpod-template.env.example)を参照してください。

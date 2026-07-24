@@ -58,3 +58,4 @@ jobs:
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:cuda12.8
             ghcr.io/${{ github.repository }}:wan22-smooth-v6
+            ghcr.io/${{ github.repository }}:wan22-lightning-longvideo

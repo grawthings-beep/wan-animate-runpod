@@ -1,5 +1,6 @@
 # name|git url|pinned commit
-# Exact dependencies used by WAN 2.2 Smooth Workflow v6.0 AIO.
+# Exact dependencies used by the bundled WAN 2.2 Smooth v6 and Native
+# Enhanced Lightning long-video workflows.
 comfyui-adaptiveprompts|https://github.com/Alectriciti/comfyui-adaptiveprompts.git|5cbad6ef1c211ad66e52026679a5cf664aded043
 comfy_mtb|https://github.com/melMass/comfy_mtb.git|b35b5d8a17c0d59e80a8b3627b679c2c1003d04f
 rgthree-comfy|https://github.com/rgthree/rgthree-comfy.git|27b4f4cdcf3b127c29d5d8135ac1536ecbd4c383
@@ -14,3 +15,7 @@ ComfyUI-NAG|https://github.com/scottmudge/ComfyUI-NAG.git|c6f27116a8259f5b501d49
 ComfyUI_Comfyroll_CustomNodes|https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git|d78b780ae43fcf8c6b7c6505e6ffb4584281ceca
 ComfyUI-GGUF|https://github.com/city96/ComfyUI-GGUF.git|6ea2651e7df66d7585f6ffee804b20e92fb38b8a
 ComfyUI-mxToolkit|https://github.com/Smirnov75/ComfyUI-mxToolkit.git|7f7a0e584f12078a1c589645d866ae96bad0cc35
+ComfyUI_Fill-Nodes|https://github.com/filliptm/ComfyUI_Fill-Nodes.git|2275a9e6905c9c862037f31b3cc2c043e0d738df
+comfyui-find-perfect-resolution|https://github.com/ashtar1984/comfyui-find-perfect-resolution.git|b8ee6c1872e796329bffbcbf53a5207aaf964bdb
+ComfyUI-PainterLongVideo|https://github.com/princepainter/ComfyUI-PainterLongVideo.git|889b4ff67909561e52d6ae023f5b9e8c33fdba94
+ComfyUI-PainterI2Vadvanced|https://github.com/princepainter/ComfyUI-PainterI2Vadvanced.git|78e037abe922b658c009a689a0b313c16e569466

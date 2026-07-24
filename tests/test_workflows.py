@@ -8,6 +8,9 @@ WORKFLOWS = (
     ROOT / "workflows" / "wan22_smooth_v6_aio_runpod.json",
     ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json",
 )
+LIGHTNING = (
+    ROOT / "workflows" / "wan22_native_enhanced_lightning_longvideo_runpod.json"
+)
 
 
 class WorkflowWiringTests(unittest.TestCase):
@@ -47,7 +50,7 @@ class WorkflowWiringTests(unittest.TestCase):
                     self.assertEqual(negative[1:3], nag_negative[1:3])
 
     def test_every_top_level_link_matches_its_declared_slots(self):
-        for path in WORKFLOWS:
+        for path in (*WORKFLOWS, LIGHTNING):
             with self.subTest(path=path.name):
                 graph = self.load(path)
                 links = {link[0]: link for link in graph["links"]}
@@ -74,6 +77,43 @@ class WorkflowWiringTests(unittest.TestCase):
                 sampler = by_id[links[cleanup["inputs"][0]["link"]][1]]
                 self.assertEqual(sampler["type"], "KSamplerWithNAG (Advanced)")
                 self.assertEqual(sampler["outputs"][0]["type"], "LATENT")
+
+    def test_lightning_models_are_normalized_to_manifest_names(self):
+        graph = self.load(LIGHTNING)
+        by_id = {node["id"]: node for node in graph["nodes"]}
+        self.assertEqual(
+            by_id[917]["widgets_values"][0],
+            "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
+        )
+        self.assertEqual(
+            by_id[918]["widgets_values"][0],
+            "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
+        )
+        self.assertEqual(
+            by_id[919]["widgets_values"][0],
+            "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8H.gguf",
+        )
+        self.assertEqual(
+            by_id[920]["widgets_values"][0],
+            "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8L.gguf",
+        )
+
+    def test_lightning_optional_loras_are_present_but_disabled(self):
+        graph = self.load(LIGHTNING)
+        nodes = [
+            node
+            for node in graph["nodes"]
+            if node["type"] == "Power Lora Loader (rgthree)"
+        ]
+        self.assertEqual(len(nodes), 8)
+        for node in nodes:
+            entries = [
+                item
+                for item in node["widgets_values"]
+                if isinstance(item, dict) and item.get("lora")
+            ]
+            self.assertEqual(len(entries), 3)
+            self.assertTrue(all(item["on"] is False for item in entries))
 
 
 if __name__ == "__main__":

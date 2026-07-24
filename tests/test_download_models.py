@@ -123,12 +123,17 @@ class DownloadModelsTests(unittest.TestCase):
         self.assertEqual(
             groups,
             {
-                "shared",
+                "text-common",
+                "clip-vision",
+                "vae-fp32",
                 "i2v",
-                "lightx-extra",
+                "lightx-i2v",
+                "lightx-i2v-extra",
+                "lightx-t2v-extra",
                 "smoothmix-loras",
                 "audio",
-                "interpolation",
+                "rife49",
+                "rife-vfi",
                 "alternate-gguf",
             },
         )
@@ -157,6 +162,41 @@ class DownloadModelsTests(unittest.TestCase):
         )
         self.assertEqual(
             workflow["extra"]["runpod_bundle"]["profile"], "loop-quality"
+        )
+
+    def test_lightning_profile_contains_every_workflow_asset(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        workflow = json.loads(
+            (
+                ROOT
+                / "workflows"
+                / "wan22_native_enhanced_lightning_longvideo_runpod.json"
+            ).read_text(encoding="utf-8")
+        )
+        profile = workflow["extra"]["runpod_bundle"]["profile"]
+        self.assertEqual(profile, "lightning-longvideo")
+        groups = DOWNLOAD_MODELS.selected_groups(manifest, profile)
+        selected = {
+            pathlib.PurePosixPath(entry["path"]).name
+            for entry in manifest["models"]
+            if entry["group"] in groups
+        }
+        self.assertTrue(
+            {
+                "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
+                "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
+                "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8H.gguf",
+                "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8L.gguf",
+                "SVI_v2_PRO_Wan2.2-I2V-A14B_HIGH_lora_rank_128_fp16.safetensors",
+                "SVI_v2_PRO_Wan2.2-I2V-A14B_LOW_lora_rank_128_fp16.safetensors",
+                "Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors",
+                "4x_NMKD-Siax_200k.pth",
+                "rife49.pth",
+            }.issubset(selected)
         )
 
 

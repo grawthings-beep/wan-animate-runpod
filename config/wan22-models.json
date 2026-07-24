@@ -3,34 +3,38 @@
   "default_profile": "full",
   "profiles": {
     "full": {
-      "description": "Every model and LoRA referenced by or linked from Smooth Workflow v6.0, including MMAudio and alternate GGUF loaders.",
-      "include_groups": ["shared", "i2v", "t2v", "lightx-extra", "smoothmix-loras", "audio", "interpolation", "alternate-gguf"]
+      "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
-      "include_groups": ["shared", "i2v", "interpolation"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
     "loop-quality": {
       "description": "Complete first/last-frame loop workspace, including every model and LoRA referenced by the loop branch (MMAudio and alternate GGUF included). Only the two T2V-only checkpoints are omitted.",
-      "include_groups": ["shared", "i2v", "lightx-extra", "smoothmix-loras", "audio", "interpolation", "alternate-gguf"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
-      "include_groups": ["shared", "t2v", "interpolation"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "t2v", "rife49", "rife-vfi"]
+    },
+    "lightning-longvideo": {
+      "description": "Everything referenced by the Native Enhanced Lightning long-video workflow, including its FP8 and Q8 alternatives, optional LoRAs, RIFE, and upscaler.",
+      "include_groups": ["text-common", "lightx-i2v", "lightx-i2v-extra", "rife49", "alternate-gguf", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     }
   },
   "models": [
     {
       "name": "WAN UMT5 XXL text encoder (FP8 scaled)",
-      "group": "shared",
-      "url": "https://huggingface.co/chatpig/encoder/resolve/main/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "group": "text-common",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/fb1388adc906ab39ffc26ee40e96b22886b56bc4/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
       "path": "models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
       "size_bytes": 6735906897,
       "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68"
     },
     {
       "name": "WAN CLIP Vision H",
-      "group": "shared",
+      "group": "clip-vision",
       "url": "https://huggingface.co/calcuis/wan-gguf/resolve/ff59c62b6a008bc99677228596e096130066b234/clip_vision_h.safetensors",
       "path": "models/clip_vision/clip_vision_h.safetensors",
       "size_bytes": 1264219396,
@@ -38,7 +42,7 @@
     },
     {
       "name": "WAN 2.1 VAE FP32 (used by WAN 2.2)",
-      "group": "shared",
+      "group": "vae-fp32",
       "url": "https://huggingface.co/calcuis/wan-gguf/resolve/ff59c62b6a008bc99677228596e096130066b234/wan_2.1_vae_fp32.safetensors",
       "path": "models/vae/Wan2_1_VAE_fp32.safetensors",
       "size_bytes": 507591212,
@@ -62,8 +66,8 @@
     },
     {
       "name": "LightX2V WAN 2.1 I2V rank128 (author-recommended for SmoothMix I2V v2)",
-      "group": "i2v",
-      "url": "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+      "group": "lightx-i2v",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy/resolve/8260d429d19fd7a72304cad059160b95d843913f/Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
       "path": "models/loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
       "size_bytes": 1466506280,
       "sha256": "5c324ada09cfa447844f5d9a57240463a515de38270ef40c7513d74be3e64e72"
@@ -92,32 +96,32 @@
     },
     {
       "name": "WAN 2.2 I2V LightX2V 4-step High",
-      "group": "lightx-extra",
-      "url": "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/main/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors",
+      "group": "lightx-i2v-extra",
+      "url": "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/570044187a5219776ef30a5c60c6f76428a3a10a/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors",
       "path": "models/loras/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors",
       "size_bytes": 634645944,
       "sha256": "887c3bdeb74e83859c920438e16ca31f39ab18ce189abc5f0e36f8348c5bbb19"
     },
     {
       "name": "WAN 2.2 I2V LightX2V 4-step Low",
-      "group": "lightx-extra",
-      "url": "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/main/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors",
+      "group": "lightx-i2v-extra",
+      "url": "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/570044187a5219776ef30a5c60c6f76428a3a10a/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors",
       "path": "models/loras/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors",
       "size_bytes": 739472104,
       "sha256": "8833bd4fd7c8eabebf0bc8ee5cfaf47f4f310ce116928a02c1adf8941dd4b0f1"
     },
     {
       "name": "WAN 2.2 T2V LightX2V 4-step High",
-      "group": "lightx-extra",
-      "url": "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/main/wan2.2_t2v_A14b_high_noise_lora_rank64_lightx2v_4step_1217.safetensors",
+      "group": "lightx-t2v-extra",
+      "url": "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/570044187a5219776ef30a5c60c6f76428a3a10a/wan2.2_t2v_A14b_high_noise_lora_rank64_lightx2v_4step_1217.safetensors",
       "path": "models/loras/wan2.2_t2v_A14b_high_noise_lora_rank64_lightx2v_4step_1217.safetensors",
       "size_bytes": 613518320,
       "sha256": "89003385f8a9d53ba58fd6ede647fdc90292e8568a54683fcfe6db5556a31769"
     },
     {
       "name": "WAN 2.2 T2V LightX2V 4-step Low",
-      "group": "lightx-extra",
-      "url": "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/main/wan2.2_t2v_A14b_low_noise_lora_rank64_lightx2v_4step_1217.safetensors",
+      "group": "lightx-t2v-extra",
+      "url": "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/570044187a5219776ef30a5c60c6f76428a3a10a/wan2.2_t2v_A14b_low_noise_lora_rank64_lightx2v_4step_1217.safetensors",
       "path": "models/loras/wan2.2_t2v_A14b_low_noise_lora_rank64_lightx2v_4step_1217.safetensors",
       "size_bytes": 613518320,
       "sha256": "4df7c206f3189472da2f92c0a42dcf308f04433d9c14302d08d56e99a3f51322"
@@ -252,15 +256,15 @@
     },
     {
       "name": "RIFE 4.9 model for ComfyUI Frame Interpolation",
-      "group": "interpolation",
-      "url": "https://huggingface.co/marduk191/rife/resolve/main/rife49.pth",
+      "group": "rife49",
+      "url": "https://huggingface.co/lividtm/RIFE/resolve/15e1387eeef9858f5267cf011134aef9192469f0/rife49.pth",
       "path": "models/rife/rife49.pth",
       "size_bytes": 21345274,
       "sha256": "e55fd00f3cc184e3c65961f4bb827a9da022e78eed36b055242c0ac30000d533"
     },
     {
       "name": "RIFE v4.26 flownet for ComfyUI-VFI",
-      "group": "interpolation",
+      "group": "rife-vfi",
       "url": "https://huggingface.co/hzwer/RIFE/resolve/main/RIFEv4.26_0921.zip",
       "path": "models/rife/RIFEv4.26_0921.zip",
       "size_bytes": 22869906,
@@ -275,6 +279,76 @@
       "path": "models/diffusion_models/wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8H.gguf",
       "size_bytes": 15406619136,
       "sha256": "deb6dcf39fefef7850d1dd49a52b70a64c65b8d8e7b5f03bc1b6a541cf58aae9"
+    },
+    {
+      "name": "WAN 2.2 Enhanced Lightning FAST MOVE V2 FP8 High",
+      "group": "lightning-native-models",
+      "url": "https://civitai.com/api/download/models/2477539",
+      "path": "models/diffusion_models/wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
+      "size_bytes": 14293829512,
+      "sha256": "65d97ca22ed892321c0e24e89ac4779937dac6505a1d641a27fee8057b7fb4e8",
+      "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
+      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+    },
+    {
+      "name": "WAN 2.2 Enhanced Lightning FAST MOVE V2 FP8 Low",
+      "group": "lightning-native-models",
+      "url": "https://civitai.com/api/download/models/2477548",
+      "path": "models/diffusion_models/wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
+      "size_bytes": 14293829488,
+      "sha256": "2ac7a7df968f40d60c8418f2b6c0dd82677f043409f70a38261be4e924d85939",
+      "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
+      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+    },
+    {
+      "name": "WAN 2.2 Enhanced Lightning FAST MOVE V2 Q8 Low",
+      "group": "lightning-native-models",
+      "url": "https://huggingface.co/DasCaptain/nsfw_models/resolve/8d5940fbfcb1b844e0b8146b313cdb896a94ed02/wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8L.gguf",
+      "path": "models/diffusion_models/wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8L.gguf",
+      "size_bytes": 15406619136,
+      "sha256": "b5722e8e01a21f89a1c0b5e9de9a3b907ce92324d1951d5ce70307956790daae"
+    },
+    {
+      "name": "Stable Video Infinity v2 Pro WAN 2.2 I2V High LoRA",
+      "group": "lightning-native-loras",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy/resolve/8260d429d19fd7a72304cad059160b95d843913f/LoRAs/Stable-Video-Infinity/v2.0/SVI_v2_PRO_Wan2.2-I2V-A14B_HIGH_lora_rank_128_fp16.safetensors",
+      "path": "models/loras/SVI_v2_PRO_Wan2.2-I2V-A14B_HIGH_lora_rank_128_fp16.safetensors",
+      "size_bytes": 1226934120,
+      "sha256": "6ddfead305cb315612bfe47291aada7431ca6bba688e88df3b2b43788ee11679"
+    },
+    {
+      "name": "Stable Video Infinity v2 Pro WAN 2.2 I2V Low LoRA",
+      "group": "lightning-native-loras",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy/resolve/8260d429d19fd7a72304cad059160b95d843913f/LoRAs/Stable-Video-Infinity/v2.0/SVI_v2_PRO_Wan2.2-I2V-A14B_LOW_lora_rank_128_fp16.safetensors",
+      "path": "models/loras/SVI_v2_PRO_Wan2.2-I2V-A14B_LOW_lora_rank_128_fp16.safetensors",
+      "size_bytes": 1226934120,
+      "sha256": "eae247da55aab0ee67f8ad99fa46aac09b69156e2ae7080b4737d611780aa7af"
+    },
+    {
+      "name": "WAN 2.2 Lightning I2V A14B 4-step Low LoRA",
+      "group": "lightning-native-loras",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy/resolve/8260d429d19fd7a72304cad059160b95d843913f/LoRAs/Wan22-Lightning/old/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors",
+      "path": "models/loras/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors",
+      "size_bytes": 613561776,
+      "sha256": "a3d474925042ec908c212c6c4c1e338637e27585c3970253f65b9638a9f5874b"
+    },
+    {
+      "name": "WAN 2.1 VAE used by Native Enhanced Lightning",
+      "group": "lightning-native-tools",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/fb1388adc906ab39ffc26ee40e96b22886b56bc4/split_files/vae/wan_2.1_vae.safetensors",
+      "path": "models/vae/wan_2.1_vae.safetensors",
+      "size_bytes": 253815318,
+      "sha256": "2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b"
+    },
+    {
+      "name": "4x NMKD Siax 200k upscaler",
+      "group": "lightning-native-tools",
+      "url": "https://huggingface.co/uwg/upscaler/resolve/f6bace545e358eab5491f8f39b90a2dd42e8cc77/ESRGAN/4x_NMKD-Siax_200k.pth",
+      "path": "models/upscale_models/4x_NMKD-Siax_200k.pth",
+      "size_bytes": 66957746,
+      "sha256": "560424d9f68625713fc47e9e7289a98aabe1d744e1cd6a9ae5a35e9957fd127e"
     }
   ]
 }
