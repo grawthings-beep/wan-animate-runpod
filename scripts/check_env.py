@@ -27,13 +27,23 @@ def entry_paths(root, entry):
     return [root / entry["path"]]
 
 
-def main():
+def missing_by_requirement(root, entries):
+    required_missing = []
+    optional_missing = []
+    for entry in entries:
+        absent = [path for path in entry_paths(root, entry) if not path.exists()]
+        target = required_missing if entry.get("required", True) else optional_missing
+        target.extend(absent)
+    return required_missing, optional_missing
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--model-root", default="/workspace/comfyui")
     parser.add_argument("--strict", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     try:
         import torch
@@ -50,21 +60,22 @@ def main():
     manifest = json.loads(pathlib.Path(args.manifest).read_text(encoding="utf-8"))
     root = pathlib.Path(args.model_root)
     entries = selected_entries(manifest, args.profile)
-    missing = []
+    required_missing, optional_missing = missing_by_requirement(root, entries)
     for entry in entries:
         paths = entry_paths(root, entry)
         absent = [path for path in paths if not path.exists()]
         if absent:
-            missing.extend(absent)
-            print(f"[check_env] MISSING {entry['name']}: {', '.join(map(str, absent))}")
+            label = "MISSING" if entry.get("required", True) else "OPTIONAL MISSING"
+            print(f"[check_env] {label} {entry['name']}: {', '.join(map(str, absent))}")
         else:
             print(f"[check_env] OK {entry['name']}")
 
     print(
         f"[check_env] profile={args.profile} assets={len(entries)} "
-        f"missing={len(missing)}"
+        f"required_missing={len(required_missing)} "
+        f"optional_missing={len(optional_missing)}"
     )
-    if missing and args.strict:
+    if required_missing and args.strict:
         return 1
     return 0
 

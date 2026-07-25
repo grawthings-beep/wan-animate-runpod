@@ -4,7 +4,7 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
@@ -19,7 +19,7 @@
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "t2v", "rife49", "rife-vfi"]
     },
     "lightning-longvideo": {
-      "description": "Everything referenced by the Native Enhanced Lightning long-video workflow, including its FP8 and Q8 alternatives, optional LoRAs, RIFE, and upscaler.",
+      "description": "Everything referenced by the production Native Enhanced Lightning long-video workflow: its connected Q8 High/Low pair, optional LoRAs, RIFE, and upscaler.",
       "include_groups": ["text-common", "lightx-i2v", "lightx-i2v-extra", "rife49", "alternate-gguf", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     }
   },
@@ -282,25 +282,27 @@
     },
     {
       "name": "WAN 2.2 Enhanced Lightning FAST MOVE V2 FP8 High",
-      "group": "lightning-native-models",
+      "group": "lightning-native-fp8-extras",
       "url": "https://civitai.com/api/download/models/2477539",
       "path": "models/diffusion_models/wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
       "size_bytes": 14293829512,
       "sha256": "65d97ca22ed892321c0e24e89ac4779937dac6505a1d641a27fee8057b7fb4e8",
       "requires_env": ["CIVITAI_API_TOKEN"],
       "auth_query_env": "CIVITAI_API_TOKEN",
-      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"},
+      "required": false
     },
     {
       "name": "WAN 2.2 Enhanced Lightning FAST MOVE V2 FP8 Low",
-      "group": "lightning-native-models",
+      "group": "lightning-native-fp8-extras",
       "url": "https://civitai.com/api/download/models/2477548",
       "path": "models/diffusion_models/wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
       "size_bytes": 14293829488,
       "sha256": "2ac7a7df968f40d60c8418f2b6c0dd82677f043409f70a38261be4e924d85939",
       "requires_env": ["CIVITAI_API_TOKEN"],
       "auth_query_env": "CIVITAI_API_TOKEN",
-      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"},
+      "required": false
     },
     {
       "name": "WAN 2.2 Enhanced Lightning FAST MOVE V2 Q8 Low",

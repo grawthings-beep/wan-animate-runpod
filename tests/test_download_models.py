@@ -187,8 +187,6 @@ class DownloadModelsTests(unittest.TestCase):
         }
         self.assertTrue(
             {
-                "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
-                "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
                 "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8H.gguf",
                 "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8L.gguf",
                 "SVI_v2_PRO_Wan2.2-I2V-A14B_HIGH_lora_rank_128_fp16.safetensors",
@@ -198,6 +196,28 @@ class DownloadModelsTests(unittest.TestCase):
                 "rife49.pth",
             }.issubset(selected)
         )
+        self.assertNotIn(
+            "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
+            selected,
+        )
+        self.assertNotIn(
+            "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
+            selected,
+        )
+
+    def test_lightning_fp8_extras_are_optional(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        fp8 = [
+            entry
+            for entry in manifest["models"]
+            if entry.get("group") == "lightning-native-fp8-extras"
+        ]
+        self.assertEqual(len(fp8), 2)
+        self.assertTrue(all(entry.get("required") is False for entry in fp8))
 
 
 if __name__ == "__main__":

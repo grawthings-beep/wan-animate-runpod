@@ -1,6 +1,6 @@
 # Workflows
 
-- `wan22_native_enhanced_lightning_longvideo_runpod.json`: 5〜20秒の連続I2V、RIFE、upscaleを含む今回のworkflow
+- `wan22_native_enhanced_lightning_longvideo_runpod.json`: 接続済みQ8 High/Lowによる5〜20秒の連続I2V、RIFE、upscaleを含む今回のworkflow（元zipの未接続FP8 loaderは除外）
 - `wan22_smooth_v6_aio_runpod.json`: Smooth v6のI2V / T2V / First-to-Last Frame / Audio2Video
 - `wan22_smooth_v6_seamless_loop_runpod.json`: Smooth v6のシームレスループpreset
 - `source/*.json`: ユーザー提供の未加工source

@@ -51,11 +51,11 @@ HF_HUB_DOWNLOAD_TIMEOUT=300
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
-`CIVITAI_API_TOKEN`と`HF_TOKEN`は平文入力ではなく、RunPod Secretsの鍵アイコンから割り当てます。HTTP portはNetworking configurationに`8188`を追加し、`PORT`/`LISTEN`は上記の環境変数にも残します。
+`CIVITAI_API_TOKEN`と`HF_TOKEN`は平文入力ではなく、RunPod Secretsの鍵アイコンから割り当てます。`lightning-longvideo`はHugging Faceだけで完結するためCivitAI tokenなしでも起動できます。HTTP portはNetworking configurationに`8188`を追加し、`PORT`/`LISTEN`は上記の環境変数にも残します。
 
 ## 高速ダウンロード
 
-`lightning-longvideo`は14 assets、約72.39 GB（67.42 GiB）です。4本をサイズ順に並列取得します。
+`lightning-longvideo`は12 assets、約43.80 GB（40.79 GiB）です。4本をサイズ順に並列取得します。
 
 - Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
 - CivitAI: 実URL解決後にaria2の16分割転送
@@ -68,13 +68,13 @@ Podを止めても`/workspace`を残せば、次回は完成済みファイル�
 
 | `MODEL_PROFILE` | Assets | 容量 | 用途 |
 |---|---:|---:|---|
-| `lightning-longvideo` | 14 | 72.39 GB | 今回のNative Enhanced Lightning。FP8/Q8両方、全候補LoRA、RIFE、upscaler |
+| `lightning-longvideo` | 12 | 43.80 GB | 今回のNative Enhanced Lightning。接続済みQ8 High/Low、全候補LoRA、RIFE、upscaler |
 | `i2v-quality` | 8 | 39.12 GB | Smooth v6のI2V |
 | `loop-quality` | 26 | 64.70 GB | Smooth v6のシームレスループ |
 | `t2v-quality` | 7 | 40.68 GB | Smooth v6のT2V |
 | `full` | 36 | 144.22 GB | 両ワークフローの全asset |
 
-LightningワークフローのQ8 High/Lowが既定の実行経路です。FP8 High/Lowも代替用として同じprofileで取得します。Enhanced V2 checkpointにはLightningが焼き込み済みなので、ワークフローへ表示した追加LoRAはすべてOFFにしてあります。
+LightningワークフローのQ8 High/Lowが既定の実行経路です。元zipにある未接続のFP8 High/Lowは本番workflowと`lightning-longvideo`から除外し、`full`だけで任意取得します。CivitAIがこの2本を拒否しても起動は止まりません。Enhanced V2 checkpointにはLightningが焼き込み済みなので、ワークフローへ表示した追加LoRAはすべてOFFにしてあります。
 
 ## ワークフロー
 

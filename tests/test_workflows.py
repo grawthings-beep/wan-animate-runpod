@@ -81,14 +81,8 @@ class WorkflowWiringTests(unittest.TestCase):
     def test_lightning_models_are_normalized_to_manifest_names(self):
         graph = self.load(LIGHTNING)
         by_id = {node["id"]: node for node in graph["nodes"]}
-        self.assertEqual(
-            by_id[917]["widgets_values"][0],
-            "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
-        )
-        self.assertEqual(
-            by_id[918]["widgets_values"][0],
-            "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
-        )
+        self.assertNotIn(917, by_id)
+        self.assertNotIn(918, by_id)
         self.assertEqual(
             by_id[919]["widgets_values"][0],
             "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8H.gguf",

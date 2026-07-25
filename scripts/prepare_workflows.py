@@ -310,6 +310,28 @@ def patch_loop(aio):
 def patch_lightning(graph):
     graph = replace_model_names(graph)
 
+    # The source canvas contains two disconnected FP8 loaders (917/918), while
+    # the actual generation graph is wired exclusively to the Q8 GGUF pair.
+    # Keeping the dead loaders makes ComfyUI report two missing models and used
+    # to make provisioning block startup on inaccessible CivitAI downloads.
+    disconnected_fp8_loaders = {917, 918}
+    linked_fp8_loaders = {
+        endpoint
+        for link in graph.get("links", [])
+        for endpoint in (link[1], link[3])
+        if endpoint in disconnected_fp8_loaders
+    }
+    if linked_fp8_loaders:
+        raise ValueError(
+            "source workflow connected an FP8 alternate; review Q8-only patch: "
+            + ", ".join(map(str, sorted(linked_fp8_loaders)))
+        )
+    graph["nodes"] = [
+        node
+        for node in graph.get("nodes", [])
+        if node.get("id") not in disconnected_fp8_loaders
+    ]
+
     # Loader metadata in the source points at generic official Wan files, while
     # the actual widgets select the author's Enhanced Lightning checkpoints.
     # Remove that stale Manager metadata so ComfyUI cannot offer the wrong
@@ -361,7 +383,9 @@ def patch_lightning(graph):
     if note and isinstance(note.get("widgets_values"), list):
         note["widgets_values"][0] = (
             "# RUNPOD BUNDLE\n\n"
-            "Use `MODEL_PROFILE=lightning-longvideo`. The selected Enhanced "
+            "Use `MODEL_PROFILE=lightning-longvideo`. This production bundle "
+            "uses the connected Q8 High/Low route; the source ZIP's disconnected "
+            "FP8 alternates are intentionally omitted. The selected Enhanced "
             "V2 checkpoint already includes Lightning. All optional LoRAs below "
             "are downloaded but intentionally OFF; do not stack another "
             "Lightning LoRA unless you deliberately want to retune motion.\n\n"
@@ -372,7 +396,7 @@ def patch_lightning(graph):
         "profile": "lightning-longvideo",
         "model_manifest": "config/wan22-models.json",
         "source": "WAN 2.2 Native Enhanced Lightning long-video",
-        "checkpoint": "Enhanced FAST MOVE V2 Lightning included",
+        "checkpoint": "Enhanced FAST MOVE V2 Q8 High/Low (Lightning included)",
         "requires_all_referenced_assets": True,
     }
     return graph

@@ -81,7 +81,7 @@ TRANSFER ENGINE: 4 files in parallel
 
 ## 5. workflowを開く
 
-Workflowsから`wan22_native_enhanced_lightning_longvideo_runpod`を開きます。最初は5秒だけ生成し、結果が良ければ10秒、15秒、20秒のgroupを順に有効化してください。
+Workflowsから`wan22_native_enhanced_lightning_longvideo_runpod`を開きます。既存Volumeを新しいimageへ更新した場合は、末尾が`-bundle-<hash>`の最新版を開いてください。Q8 High/Lowだけの本番版なのでFP8不足表示は出ません。最初は5秒だけ生成し、結果が良ければ10秒、15秒、20秒のgroupを順に有効化してください。
 
 ## 6. 更新
 
