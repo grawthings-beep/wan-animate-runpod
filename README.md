@@ -20,13 +20,13 @@ ghcr.io/grawthings-beep/wan-animate-runpod:latest
 
 RunPodから認証なしでpullする場合、GitHub PackagesでパッケージをPublicにしてください。
 
-## Lightning長尺ワークフローのRunPod設定
+## シームレスループのRunPod設定
 
 ```text
 Template type: Pod
-Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-lightning-longvideo
+Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
 Container disk: 50 GB
-Volume disk: 200 GB以上（全profileを残すなら300 GB推奨）
+Volume disk: 100 GB以上（生成動画を多く残すなら150 GB推奨）
 Volume mount path: /workspace
 HTTP port: 8188
 ```
@@ -37,7 +37,7 @@ HTTP port: 8188
 PORT=8188
 LISTEN=0.0.0.0
 DOWNLOAD_MODELS=1
-MODEL_PROFILE=lightning-longvideo
+MODEL_PROFILE=loop-quality
 CIVITAI_API_TOKEN={{ RUNPOD_SECRET_CIVITAI_TOKEN }}
 HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
 RUN_DEP_CHECK=1
@@ -51,11 +51,11 @@ HF_HUB_DOWNLOAD_TIMEOUT=300
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
-`CIVITAI_API_TOKEN`と`HF_TOKEN`は平文入力ではなく、RunPod Secretsの鍵アイコンから割り当てます。`lightning-longvideo`はHugging Faceだけで完結するためCivitAI tokenなしでも起動できます。HTTP portはNetworking configurationに`8188`を追加し、`PORT`/`LISTEN`は上記の環境変数にも残します。
+`CIVITAI_API_TOKEN`と`HF_TOKEN`は平文入力ではなく、RunPod Secretsの鍵アイコンから割り当てます。既定の`loop-quality`はHugging Faceだけで完結するため、CivitAI tokenなしでも起動できます。HTTP portはNetworking configurationに`8188`を追加し、`PORT`/`LISTEN`は上記の環境変数にも残します。
 
 ## 高速ダウンロード
 
-`lightning-longvideo`は12 assets、約43.80 GB（40.79 GiB）です。4本をサイズ順に並列取得します。
+既定の`loop-quality`は7 assets、約39.10 GBです。4本をサイズ順に並列取得します。
 
 - Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
 - CivitAI: 実URL解決後にaria2の16分割転送
@@ -70,11 +70,11 @@ Podを止めても`/workspace`を残せば、次回は完成済みファイル�
 |---|---:|---:|---|
 | `lightning-longvideo` | 12 | 43.80 GB | 今回のNative Enhanced Lightning。接続済みQ8 High/Low、全候補LoRA、RIFE、upscaler |
 | `i2v-quality` | 8 | 39.12 GB | Smooth v6のI2V |
-| `loop-quality` | 26 | 64.70 GB | Smooth v6のシームレスループ |
+| `loop-quality` | 7 | 39.10 GB | Smooth v6の音なしシームレスループ（実行経路だけ） |
 | `t2v-quality` | 7 | 40.68 GB | Smooth v6のT2V |
 | `full` | 36 | 144.22 GB | 両ワークフローの全asset |
 
-LightningワークフローのQ8 High/Lowが既定の実行経路です。元zipにある未接続のFP8 High/Lowは本番workflowと`lightning-longvideo`から除外し、`full`だけで任意取得します。CivitAIがこの2本を拒否しても起動は止まりません。Enhanced V2 checkpointにはLightningが焼き込み済みなので、ワークフローへ表示した追加LoRAはすべてOFFにしてあります。
+`loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、唯一ONのLightX2V rank128 LoRAだけを取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
 
 ## ワークフロー
 
@@ -84,14 +84,12 @@ LightningワークフローのQ8 High/Lowが既定の実行経路です。元zip
 - `wan22_smooth_v6_aio_runpod`
 - `wan22_smooth_v6_seamless_loop_runpod`
 
-Lightning版の流れ:
+ループ版の流れ:
 
-1. Load Imageを自分の開始画像に差し替える。
-2. まず最初の5秒セクションだけを生成し、seedとpromptを固める。
-3. 気に入ったら次の10/15/20秒セクションを順に有効化する。
-4. 最後にRIFE 60fpsまたはupscale groupを必要なときだけ有効化する。
-
-各セクションの`initial_reference_image`には最初の画像が渡され、`previous_video`の末尾フレームから続きます。`motion_amplitude=1.15`を基準にし、遅ければ1.2〜1.3へ上げます。色ずれは`color_protect=True`、`correct_strength=0.01〜0.05`から調整します。
+1. `wan22_smooth_v6_seamless_loop_runpod`を開く。
+2. FIRST FRAMEとLAST FRAMEへ同じ画像を入れる。
+3. まず81 framesで、往復ではなく一周する連続動作をpromptへ書く。
+4. 短いループの継ぎ目を確認してから長さやRIFE補間を増やす。
 
 ## GPU
 
@@ -99,7 +97,7 @@ Lightning版の流れ:
 - 実用: L40S / RTX 6000 Ada 48GB（832×480、81 framesを基準）
 - 24GB: 動く場合はありますが長尺・RIFE・upscale用途には非推奨
 
-長尺4セクションを一度に走らせず、5秒ごとに結果を確認してください。RIFEとupscaleは生成が完成してから有効化する方がVRAMと時間を無駄にしません。
+最初から長くせず、81 framesで継ぎ目を確認してください。RIFEは生成結果が安定してから有効化する方がVRAMと時間を無駄にしません。
 
 ## 永続化レイアウト
 

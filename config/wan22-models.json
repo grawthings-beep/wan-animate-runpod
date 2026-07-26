@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "default_profile": "full",
+  "default_profile": "loop-quality",
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
@@ -11,8 +11,8 @@
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
     "loop-quality": {
-      "description": "Complete first/last-frame loop workspace, including every model and LoRA referenced by the loop branch (MMAudio and alternate GGUF included). Only the two T2V-only checkpoints are omitted.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf"]
+      "description": "Lean, silent first/last-frame loop workspace. Includes only the connected SmoothMix I2V pair, the author's active LightX2V rank128 LoRA, CLIP/VAE/text encoder, and interpolation models.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",

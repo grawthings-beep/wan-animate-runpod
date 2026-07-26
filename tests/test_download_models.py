@@ -113,7 +113,7 @@ class DownloadModelsTests(unittest.TestCase):
         self.assertNotIn("top-secret", redacted)
         self.assertIn("token=REDACTED", redacted)
 
-    def test_loop_profile_includes_every_loop_branch_asset_group(self):
+    def test_loop_profile_contains_only_connected_loop_asset_groups(self):
         import json
 
         manifest = json.loads(
@@ -128,13 +128,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "vae-fp32",
                 "i2v",
                 "lightx-i2v",
-                "lightx-i2v-extra",
-                "lightx-t2v-extra",
-                "smoothmix-loras",
-                "audio",
                 "rife49",
-                "rife-vfi",
-                "alternate-gguf",
             },
         )
         selected = {
@@ -142,15 +136,13 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertTrue(
-            {
-                "mmaudio_vae_44k_fp16.safetensors",
-                "mmaudio_synchformer_fp16.safetensors",
-                "apple_DFN5B-CLIP-ViT-H-14-384_fp16.safetensors",
-                "mmaudio_large_44k_v2_fp16.safetensors",
-                "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2Q8H.gguf",
-            }.issubset(selected)
+        self.assertEqual(len(selected), 7)
+        self.assertIn(
+            "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+            selected,
         )
+        self.assertFalse(any(name.startswith("mmaudio_") for name in selected))
+        self.assertFalse(any(name.endswith(".gguf") for name in selected))
 
     def test_loop_workflow_declares_compatible_profile(self):
         import json

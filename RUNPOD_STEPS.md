@@ -9,6 +9,8 @@ CIVITAI_TOKEN = CivitAI API tokenの実値
 HF_TOKEN       = Hugging Face read tokenの実値
 ```
 
+`loop-quality`だけならCivitAI tokenは不要です。他profileも使う場合だけ作成します。
+
 Templateの環境変数では鍵アイコンを押し、次のように割り当てます。
 
 ```text
@@ -22,9 +24,9 @@ tokenの実値を平文のEnvironment variablesへ貼らないでください。
 
 ```text
 Template type: Pod
-Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-lightning-longvideo
+Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
 Container disk: 50 GB
-Volume disk: 200 GB以上（fullも保持するなら300 GB推奨）
+Volume disk: 100 GB以上（生成動画を多く残すなら150 GB推奨）
 Volume mount path: /workspace
 ```
 
@@ -42,7 +44,7 @@ Environment variables:
 PORT=8188
 LISTEN=0.0.0.0
 DOWNLOAD_MODELS=1
-MODEL_PROFILE=lightning-longvideo
+MODEL_PROFILE=loop-quality
 CIVITAI_API_TOKEN={{ RUNPOD_SECRET_CIVITAI_TOKEN }}
 HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
 RUN_DEP_CHECK=1
@@ -64,24 +66,24 @@ RunPod UIではSecretを選ぶと表示形式が多少違う場合がありま�
 - コスパ: A100 80GB
 - 実用下限: L40SまたはRTX 6000 Ada 48GB
 
-Native Enhanced Lightningは既定で832×480、81 framesです。48GBでは5秒セクションを順番に実行し、RIFE/upscaleを最後に有効化します。
+シームレスループはまず81 framesで継ぎ目を確認します。FIRST FRAMEとLAST FRAMEには同じ画像を設定し、RIFEは短いループが安定してから有効化します。
 
 ## 4. 初回起動
 
 Logsで次を確認します。
 
 ```text
-MODEL PROFILE: lightning-longvideo (14 assets)
+MODEL PROFILE: loop-quality (7 assets)
 TRANSFER ENGINE: 4 files in parallel
 ...
-[check_env] profile=lightning-longvideo assets=14 missing=0
+[check_env] profile=loop-quality assets=7 missing=0
 ```
 
-初回は約72.39 GBです。途中でPodを停止しても、同じVolumeならHF cacheまたは`.part`から再開します。`missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
+初回は約39.10 GBです。途中でPodを停止しても、同じVolumeならHF cacheまたは`.part`から再開します。`missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
 
 ## 5. workflowを開く
 
-Workflowsから`wan22_native_enhanced_lightning_longvideo_runpod`を開きます。既存Volumeを新しいimageへ更新した場合は、末尾が`-bundle-<hash>`の最新版を開いてください。Q8 High/Lowだけの本番版なのでFP8不足表示は出ません。最初は5秒だけ生成し、結果が良ければ10秒、15秒、20秒のgroupを順に有効化してください。
+Workflowsから`wan22_smooth_v6_seamless_loop_runpod`を開きます。既存Volumeを新しいimageへ更新した場合は、末尾が`-bundle-<hash>`の最新版を開いてください。FIRST FRAMEとLAST FRAMEに同じ画像を設定し、最初は81 framesで生成してください。
 
 ## 6. 更新
 

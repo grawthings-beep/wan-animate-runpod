@@ -90,6 +90,32 @@ def configure_lora_node(node, entries):
         node["size"][1] = max(float(node["size"][1]), 190 + 48 * len(entries))
 
 
+def remove_nodes(graph, node_ids):
+    """Remove nodes and every top-level link that touches them."""
+    node_ids = set(node_ids)
+    removed_link_ids = {
+        link[0]
+        for link in graph.get("links", [])
+        if link[1] in node_ids or link[3] in node_ids
+    }
+    graph["nodes"] = [
+        node for node in graph.get("nodes", []) if node["id"] not in node_ids
+    ]
+    graph["links"] = [
+        link for link in graph.get("links", []) if link[0] not in removed_link_ids
+    ]
+    for node in graph["nodes"]:
+        for item in node.get("inputs", []):
+            if item.get("link") in removed_link_ids:
+                item["link"] = None
+        for item in node.get("outputs", []):
+            links = item.get("links")
+            if links is not None:
+                item["links"] = [
+                    link_id for link_id in links if link_id not in removed_link_ids
+                ]
+
+
 def _top_level_link(graph, link_id):
     return next(link for link in graph["links"] if link[0] == link_id)
 
@@ -274,17 +300,50 @@ def nodes_in_group(graph, group_id):
 
 def patch_loop(aio):
     graph = copy.deepcopy(aio)
-    by_id = {node["id"]: node for node in graph["nodes"]}
 
-    # The original AIO intentionally opens with all four top-level workflows
-    # bypassed. This preset activates First2LastFrame and leaves audio disabled,
-    # which avoids an audible discontinuity at the loop boundary.
-    for group_id in (17, 18, 34, 36):
-        for node in nodes_in_group(graph, group_id):
-            node["mode"] = 0 if group_id == 36 else 4
-    for node in nodes_in_group(graph, 47):
-        node["mode"] = 4
-    by_id[339]["mode"] = 4
+    # The source AIO opens every top-level workflow in bypass mode. Activate
+    # the retained First2LastFrame branch before pruning everything else.
+    for node in nodes_in_group(graph, 36):
+        node["mode"] = 0
+
+    # This artifact is a loop-only workflow, not an AIO canvas with three
+    # bypassed branches. Pruning the unused branches prevents ComfyUI from
+    # reporting their optional checkpoints, LoRAs, and audio models as missing.
+    unused_node_ids = set()
+    for group_id in (17, 18, 34, 35, 47):
+        unused_node_ids.update(node["id"] for node in nodes_in_group(graph, group_id))
+    # The loop branch's GGUF loaders are disconnected alternates. Audio is
+    # intentionally omitted because independently generated sound cannot loop
+    # cleanly at the video boundary.
+    unused_node_ids.update({308, 313, 339, 358, 359})
+    remove_nodes(graph, unused_node_ids)
+
+    keep_group_ids = {36, 37, 38, 39, 40, 41, 42, 44, 45, 46, 48, 52}
+    graph["groups"] = [
+        group for group in graph.get("groups", []) if group["id"] in keep_group_ids
+    ]
+
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    configure_lora_node(
+        by_id[325],
+        [
+            lora(
+                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+                3.0,
+                True,
+            )
+        ],
+    )
+    configure_lora_node(
+        by_id[324],
+        [
+            lora(
+                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+                1.5,
+                True,
+            )
+        ],
+    )
 
     by_id[338]["title"] = "1. SELECT LOOP IMAGE (FIRST FRAME)"
     by_id[342]["title"] = "2. SELECT THE SAME IMAGE (LAST FRAME)"
@@ -294,7 +353,8 @@ def patch_loop(aio):
         "Use exactly the same source image in FIRST FRAME and LAST FRAME. "
         "Describe continuous cyclic motion and avoid cuts, entrances, exits, "
         "or irreversible actions. Generate 81 frames first; extend only after "
-        "the short loop is clean.\n\n"
+        "the short loop is clean. This preset is deliberately silent so the "
+        "audio track cannot introduce a seam.\n\n"
         + existing_note
     )
     combine = by_id[332].get("widgets_values")
