@@ -76,6 +76,8 @@ Podを止めても`/workspace`を残せば、次回は完成済みファイル�
 
 `loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、LightX2V rank128と、指定されたNSFW-22 High/Lowを取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
 
+RunPodは同じ可変Dockerタグをキャッシュする場合があります。更新直後のPodで古いworkflowや不足モデルが表示された場合は、既存PodのStop/Startではなく新規Podを作成し、Actionsが発行する`sha-<40文字のcommit SHA>`タグをContainer Imageに指定してください。起動ログの`BUNDLE REVISION`がそのSHAと一致し、`[check_env] ... required_missing=0`になるまでComfyUIは起動しません。
+
 ループworkflowのLoRA:
 
 - `LightX2V rank128`: 少ないstep数で生成するためのアクセラレータ。High 3.0 / Low 1.5で既定ON

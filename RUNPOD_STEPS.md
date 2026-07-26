@@ -76,10 +76,15 @@ Logsで次を確認します。
 MODEL PROFILE: loop-quality (9 assets)
 TRANSFER ENGINE: 4 files in parallel
 ...
-[check_env] profile=loop-quality assets=9 missing=0
+[check_env] profile=loop-quality assets=9 required_missing=0 optional_missing=0
 ```
 
-初回は約40.32 GBです。途中でPodを停止しても、同じVolumeならHF cacheまたは`.part`から再開します。`missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
+更新直後はRunPodの可変タグキャッシュを避けるため、GitHub Actionsが発行した
+`ghcr.io/grawthings-beep/wan-animate-runpod:sha-<40文字のcommit SHA>`を
+Container Imageに指定します。既存PodのStop/Startではイメージが更新されないため、
+Podを作り直してください。ログ先頭の`BUNDLE REVISION`が指定SHAと一致することも確認します。
+
+初回は約40.32 GBです。途中でPodを停止しても、同じVolumeならHF cacheまたは`.part`から再開します。`required_missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
 
 ## 5. workflowを開く
 

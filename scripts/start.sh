@@ -20,6 +20,10 @@ MODEL_PROFILE="${MODEL_PROFILE:-loop-quality}"
 PORT="${PORT:-8188}"
 LISTEN="${LISTEN:-0.0.0.0}"
 
+echo "BUNDLE REVISION: ${BUNDLE_REVISION:-unknown}"
+echo "MODEL PROFILE: ${MODEL_PROFILE}"
+echo "MODEL ROOT: ${MODEL_ROOT}"
+
 export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
 export HF_XET_CACHE="${HF_XET_CACHE:-${HF_HOME}/xet}"
 # RunPod's datacenter links and SSD-backed volumes benefit from Xet's enlarged

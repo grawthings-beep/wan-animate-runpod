@@ -54,8 +54,11 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            BUNDLE_REVISION=${{ github.sha }}
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:cuda12.8
             ghcr.io/${{ github.repository }}:wan22-smooth-v6
             ghcr.io/${{ github.repository }}:wan22-lightning-longvideo
+            ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
