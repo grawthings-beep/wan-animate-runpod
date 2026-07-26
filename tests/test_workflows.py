@@ -89,7 +89,7 @@ class WorkflowWiringTests(unittest.TestCase):
                 self.assertEqual(sampler["type"], "KSamplerWithNAG (Advanced)")
                 self.assertEqual(sampler["outputs"][0]["type"], "LATENT")
 
-    def test_loop_workflow_references_only_required_lora(self):
+    def test_loop_workflow_has_accelerator_and_optional_nsfw_pair(self):
         graph = self.load(WORKFLOWS[1])
         entries = [
             item
@@ -98,14 +98,24 @@ class WorkflowWiringTests(unittest.TestCase):
             for item in node["widgets_values"]
             if isinstance(item, dict) and item.get("lora")
         ]
-        self.assertEqual(len(entries), 2)
+        self.assertEqual(len(entries), 4)
         self.assertEqual(
             {item["lora"] for item in entries},
+            {
+                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+                "NSFW-22-H-e8.safetensors",
+                "NSFW-22-L-e8.safetensors",
+            },
+        )
+        active = {item["lora"] for item in entries if item["on"] is True}
+        self.assertEqual(
+            active,
             {
                 "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors"
             },
         )
-        self.assertTrue(all(item["on"] is True for item in entries))
+        nsfw = [item for item in entries if item["lora"].startswith("NSFW-22-")]
+        self.assertEqual({item["strength"] for item in nsfw}, {0.25})
 
     def test_loop_workflow_has_no_unused_model_loaders(self):
         graph = self.load(WORKFLOWS[1])

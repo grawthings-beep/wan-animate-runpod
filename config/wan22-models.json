@@ -4,7 +4,7 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
@@ -12,7 +12,7 @@
     },
     "loop-quality": {
       "description": "Lean, silent first/last-frame loop workspace. Includes only the connected SmoothMix I2V pair, the author's active LightX2V rank128 LoRA, CLIP/VAE/text encoder, and interpolation models.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "rife49"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -71,6 +71,24 @@
       "path": "models/loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
       "size_bytes": 1466506280,
       "sha256": "5c324ada09cfa447844f5d9a57240463a515de38270ef40c7513d74be3e64e72"
+    },
+    {
+      "name": "WAN 2.2 General NSFW v0.08a High",
+      "group": "loop-nsfw-loras",
+      "url": "https://huggingface.co/uwgm/nikke-civitai-backup/resolve/main/NSFW-22-H-e8%20(2).safetensors",
+      "path": "models/loras/NSFW-22-H-e8.safetensors",
+      "size_bytes": 613516752,
+      "sha256": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
+      "requires_env": ["HF_TOKEN"]
+    },
+    {
+      "name": "WAN 2.2 General NSFW v0.08a Low",
+      "group": "loop-nsfw-loras",
+      "url": "https://huggingface.co/uwgm/nikke-civitai-backup/resolve/main/NSFW-22-L-e8%20(2).safetensors",
+      "path": "models/loras/NSFW-22-L-e8.safetensors",
+      "size_bytes": 613516752,
+      "sha256": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db",
+      "requires_env": ["HF_TOKEN"]
     },
     {
       "name": "SmoothMix WAN 2.2 T2V v4 High",

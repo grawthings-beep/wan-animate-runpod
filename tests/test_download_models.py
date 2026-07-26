@@ -76,6 +76,12 @@ class DownloadModelsTests(unittest.TestCase):
             ),
             ("org/repo", "refs/pr/1", "model.bin"),
         )
+        self.assertEqual(
+            DOWNLOAD_MODELS.parse_huggingface_url(
+                "https://huggingface.co/org/repo/resolve/main/model%20(2).safetensors"
+            ),
+            ("org/repo", "main", "model (2).safetensors"),
+        )
 
     def test_largest_files_are_scheduled_first(self):
         entries = [
@@ -128,6 +134,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "vae-fp32",
                 "i2v",
                 "lightx-i2v",
+                "loop-nsfw-loras",
                 "rife49",
             },
         )
@@ -136,13 +143,18 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 7)
+        self.assertEqual(len(selected), 9)
         self.assertIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
             selected,
         )
         self.assertFalse(any(name.startswith("mmaudio_") for name in selected))
         self.assertFalse(any(name.endswith(".gguf") for name in selected))
+        self.assertTrue(
+            {"NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"}.issubset(
+                selected
+            )
+        )
 
     def test_loop_workflow_declares_compatible_profile(self):
         import json

@@ -73,13 +73,13 @@ RunPod UIではSecretを選ぶと表示形式が多少違う場合がありま�
 Logsで次を確認します。
 
 ```text
-MODEL PROFILE: loop-quality (7 assets)
+MODEL PROFILE: loop-quality (9 assets)
 TRANSFER ENGINE: 4 files in parallel
 ...
-[check_env] profile=loop-quality assets=7 missing=0
+[check_env] profile=loop-quality assets=9 missing=0
 ```
 
-初回は約39.10 GBです。途中でPodを停止しても、同じVolumeならHF cacheまたは`.part`から再開します。`missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
+初回は約40.32 GBです。途中でPodを停止しても、同じVolumeならHF cacheまたは`.part`から再開します。`missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
 
 ## 5. workflowを開く
 

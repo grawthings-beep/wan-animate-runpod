@@ -55,7 +55,7 @@ COMFYUI_ARGS=--reserve-vram 3
 
 ## 高速ダウンロード
 
-既定の`loop-quality`は7 assets、約39.10 GBです。4本をサイズ順に並列取得します。
+既定の`loop-quality`は9 assets、約40.32 GBです。4本をサイズ順に並列取得します。
 
 - Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
 - CivitAI: 実URL解決後にaria2の16分割転送
@@ -70,11 +70,18 @@ Podを止めても`/workspace`を残せば、次回は完成済みファイル�
 |---|---:|---:|---|
 | `lightning-longvideo` | 12 | 43.80 GB | 今回のNative Enhanced Lightning。接続済みQ8 High/Low、全候補LoRA、RIFE、upscaler |
 | `i2v-quality` | 8 | 39.12 GB | Smooth v6のI2V |
-| `loop-quality` | 7 | 39.10 GB | Smooth v6の音なしシームレスループ（実行経路だけ） |
+| `loop-quality` | 9 | 40.32 GB | Smooth v6の音なしシームレスループ＋NSFW-22 High/Low |
 | `t2v-quality` | 7 | 40.68 GB | Smooth v6のT2V |
-| `full` | 36 | 144.22 GB | 両ワークフローの全asset |
+| `full` | 38 | 145.45 GB | 両ワークフローの全asset |
 
-`loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、唯一ONのLightX2V rank128 LoRAだけを取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
+`loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、LightX2V rank128と、指定されたNSFW-22 High/Lowを取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
+
+ループworkflowのLoRA:
+
+- `LightX2V rank128`: 少ないstep数で生成するためのアクセラレータ。High 3.0 / Low 1.5で既定ON
+- `NSFW-22-H/L-e8`: CubeyAIのWAN 2.2 General NSFW v0.08a。High/Lowを対応するloaderへ追加済みだが既定OFF
+
+NSFW-22は配布者が約0.9を好むと説明していますが、この6-step＋LightX2V構成では重ね掛けが強くなります。まずHigh/Lowとも`0.20〜0.25`でONにし、必要なら`0.05`ずつ上げてください。480p I2V向けで、720p I2Vは配布者自身が非推奨です。private backupから取得するため`HF_TOKEN`が必要です。
 
 ## ワークフロー
 

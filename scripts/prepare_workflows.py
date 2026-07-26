@@ -331,7 +331,8 @@ def patch_loop(aio):
                 "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
                 3.0,
                 True,
-            )
+            ),
+            lora("NSFW-22-H-e8.safetensors", 0.25),
         ],
     )
     configure_lora_node(
@@ -341,7 +342,8 @@ def patch_loop(aio):
                 "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
                 1.5,
                 True,
-            )
+            ),
+            lora("NSFW-22-L-e8.safetensors", 0.25),
         ],
     )
 
@@ -355,6 +357,9 @@ def patch_loop(aio):
         "or irreversible actions. Generate 81 frames first; extend only after "
         "the short loop is clean. This preset is deliberately silent so the "
         "audio track cannot introduce a seam.\n\n"
+        "The optional NSFW-22 High/Low LoRAs are downloaded but OFF. Start at "
+        "0.20-0.25 on both sides; high strengths can damage temporal coherence "
+        "when stacked with the active LightX2V accelerator.\n\n"
         + existing_note
     )
     combine = by_id[332].get("widgets_values")
