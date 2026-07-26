@@ -6,14 +6,9 @@
 ARG BASE_IMAGE=runpod/comfyui:1.4.4-cuda12.8
 FROM ${BASE_IMAGE}
 
-ARG BUNDLE_REVISION=unknown
-
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1 \
-    BUNDLE_REVISION=${BUNDLE_REVISION}
-
-LABEL org.opencontainers.image.revision="${BUNDLE_REVISION}"
+    PIP_NO_CACHE_DIR=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -42,6 +37,10 @@ RUN set -eu; \
 
 RUN chmod +x /opt/runpod-wan-animate/scripts/*.sh \
     && /opt/runpod-wan-animate/scripts/install_custom_nodes.sh
+
+ARG BUNDLE_REVISION=unknown
+ENV BUNDLE_REVISION=${BUNDLE_REVISION}
+LABEL org.opencontainers.image.revision="${BUNDLE_REVISION}"
 
 EXPOSE 8188
 
