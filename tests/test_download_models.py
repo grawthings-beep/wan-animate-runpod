@@ -5,6 +5,7 @@ import pathlib
 import tempfile
 import unittest
 import zipfile
+from collections import namedtuple
 from unittest import mock
 
 
@@ -103,6 +104,63 @@ class DownloadModelsTests(unittest.TestCase):
             part = root / "models" / "model.part"
             DOWNLOAD_MODELS.materialize_cached_file(cached, part)
             self.assertEqual(part.read_bytes(), b"xet cache payload")
+
+    def test_disk_preflight_accounts_for_resumable_partial(self):
+        entries = [
+            {
+                "name": "large",
+                "path": "models/large.bin",
+                "size_bytes": 10,
+            }
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            part = root / "models" / "large.bin.part"
+            part.parent.mkdir()
+            part.write_bytes(b"1234")
+            missing, unknown = DOWNLOAD_MODELS.missing_download_bytes(entries, root)
+        self.assertEqual(missing, 6)
+        self.assertEqual(unknown, [])
+
+    def test_disk_preflight_fails_before_an_undersized_download(self):
+        usage = namedtuple("usage", "total used free")
+        entries = [
+            {
+                "name": "model",
+                "path": "models/model.bin",
+                "size_bytes": 40_000_000_000,
+            }
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            with self.assertRaisesRegex(RuntimeError, "Increase the RunPod Volume Disk"):
+                DOWNLOAD_MODELS.ensure_disk_capacity(
+                    entries,
+                    root,
+                    headroom_gb=12,
+                    disk_usage=lambda _path: usage(
+                        50_000_000_000, 5_000_000_000, 45_000_000_000
+                    ),
+                )
+
+    def test_disk_preflight_accepts_sufficient_capacity(self):
+        usage = namedtuple("usage", "total used free")
+        entries = [
+            {
+                "name": "model",
+                "path": "models/model.bin",
+                "size_bytes": 40_000_000_000,
+            }
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            DOWNLOAD_MODELS.ensure_disk_capacity(
+                entries,
+                pathlib.Path(directory),
+                headroom_gb=12,
+                disk_usage=lambda _path: usage(
+                    100_000_000_000, 10_000_000_000, 90_000_000_000
+                ),
+            )
 
     def test_auth_query_is_added_without_losing_existing_parameters(self):
         with mock.patch.dict(os.environ, {"CIVITAI_API_TOKEN": "top secret"}):

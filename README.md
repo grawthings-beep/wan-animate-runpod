@@ -5,7 +5,7 @@ RunPodで次の2系統をそのまま開けるComfyUIイメージです。
 - Smooth Workflow v6.0: I2V / T2V / First-to-Last Frame / MMAudio / シームレスループ
 - Native Enhanced Lightning Long Video: 5〜20秒の連続I2V、RIFE 60fps化、2倍アップスケール
 
-ワークフロー、18個のcustom-node pack、モデル/LoRA manifestを同じcommitで固定しています。初回起動時だけ永続Volumeへモデルを取得し、以後は検証済みファイルと途中ダウンロードを再利用します。
+ワークフロー、18個のcustom-node pack、モデル/LoRA manifestを同じcommitで固定しています。Network Volumeは不要です。新しいPodではローカルVolume Diskへモデルを高速取得し、同じPodをStop/Startした場合だけ検証済みファイルと途中ダウンロードを再利用します。PodをTerminateすればVolume Diskも削除され、次のPodでは最初から取得します。
 
 ## コンテナイメージ
 
@@ -47,7 +47,13 @@ ARIA2_SPLITS=16
 HF_SNAPSHOT_WORKERS=8
 HF_XET_HIGH_PERFORMANCE=1
 HF_XET_NUM_CONCURRENT_RANGE_GETS=64
+HF_XET_CHUNK_CACHE_SIZE_BYTES=0
 HF_HUB_DOWNLOAD_TIMEOUT=300
+CUDA_PREFLIGHT=1
+CUDA_READY_TIMEOUT=90
+CUDA_READY_INTERVAL=10
+MODEL_DISK_PREFLIGHT=1
+MODEL_DISK_HEADROOM_GB=12
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
@@ -58,11 +64,14 @@ COMFYUI_ARGS=--reserve-vram 3
 既定の`loop-quality`は9 assets、約40.32 GBです。4本をサイズ順に並列取得します。
 
 - Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
+- Xet chunk cache: 一回限りの新規取得には不利なので`0`。公式既定と同じく余分な最大10 GBを使わない
 - CivitAI: 実URL解決後にaria2の16分割転送
 - 再開: HF cacheとaria2の`.part`を永続Volumeに保持
 - 完全性: 公開元のsizeとSHA256を全単一ファイルで検証
 
-Podを止めても`/workspace`を残せば、次回は完成済みファイルを再取得しません。429や帯域制限が出る環境だけ`DOWNLOAD_WORKERS=2`へ下げてください。
+Network Volumeを使わなくても、RunPodのローカルVolume Diskは`/workspace`へマウントされます。同じPodのStop/Startでは保持され、PodのTerminateで削除されます。毎回ダウンロードする方針なら、PodをTerminateして新規デプロイしてください。429や帯域制限が出る環境だけ`DOWNLOAD_WORKERS=2`へ下げてください。
+
+ダウンロード前に、選択profileの未取得容量と12 GBの作業・出力余白を確認します。`loop-quality`では約52.32 GB以上の空きが必要です。テンプレートはVolume Disk 100 GBにしてください。容量不足なら1 byteも取得する前に停止し、`Disk quota exceeded`を防ぎます。
 
 ## モデルprofile
 
@@ -104,9 +113,23 @@ NSFW-22は配布者が約0.9を好むと説明していますが、この6-step�
 
 - 推奨: H100 80GB / A100 80GB
 - 実用: L40S / RTX 6000 Ada 48GB（832×480、81 framesを基準）
-- 24GB: 動く場合はありますが長尺・RIFE・upscale用途には非推奨
+- RTX 5090 32GB: CUDA 12.8 imageで対応。短尺の確認用。ホスト品質にばらつきがあるため起動時検査あり
+- RTX 4090 24GB: 低解像度・短尺の確認用。長尺・RIFE・upscale用途には非推奨
 
 最初から長くせず、81 framesで継ぎ目を確認してください。RIFEは生成結果が安定してから有効化する方がVRAMと時間を無駄にしません。
+
+### 4090/5090の`CUDA unknown error`
+
+RunPodではPodが特定の物理ホストへ割り当てられます。問題のログでは5090を`nvidia-smi`は認識している一方、CUDA 12.8版PyTorchの`torch.cuda.is_available()`が`False`で、実テンソル演算も`CUDA unknown error`になっていました。これはVRAM不足やworkflow設定ではなく、その割り当てホストのCUDA初期化失敗です。
+
+起動時に別Pythonプロセスで`nvidia-smi`と実CUDA演算を最大90秒検査します。合格するまでモデルダウンロードは始めません。次が出た場合はPodを**Terminateして新規デプロイ**してください。Stop/Startは同じ物理ホストに紐づいたままになる場合があります。
+
+```text
+[gpu-preflight] FATAL: this Pod's assigned GPU cannot execute CUDA.
+No model download was started.
+```
+
+`CUDA out of memory`は別問題です。その場合は832×480・81 framesから始め、RIFEと2倍upscaleを切って確認してください。
 
 ## 永続化レイアウト
 

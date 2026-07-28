@@ -18,6 +18,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 
 USER_AGENT = "grawthings-wan22-runpod/3"
+DECIMAL_GB = 1_000_000_000
 
 
 def expand(value):
@@ -469,6 +470,73 @@ def largest_first(entries):
     )
 
 
+def entry_looks_complete(entry, root):
+    """Cheap size/marker check used before transfer; SHA verification happens later."""
+    entry = expand(entry)
+    output = root / entry["path"]
+    if entry.get("repo_id"):
+        sentinel = output / ".snapshot-complete.json"
+        return sentinel.is_file() and any(path.is_file() for path in output.rglob("*"))
+    if entry.get("extract"):
+        return extracted_ready(entry, root)
+    if not output.is_file():
+        return False
+    actual_size = output.stat().st_size
+    expected_size = int(entry.get("size_bytes") or 0)
+    min_bytes = int(entry.get("min_bytes") or expected_size or 1)
+    return (not expected_size or actual_size == expected_size) and actual_size >= min_bytes
+
+
+def missing_download_bytes(entries, root):
+    """Estimate additional bytes needed, accounting for resumable .part files."""
+    missing = 0
+    unknown = []
+    for raw_entry in entries:
+        entry = expand(raw_entry)
+        if entry_looks_complete(entry, root):
+            continue
+        expected_size = int(entry.get("size_bytes") or 0)
+        if expected_size <= 0:
+            unknown.append(entry.get("name") or entry.get("path"))
+            continue
+        output = root / entry["path"]
+        part = output.with_name(f"{output.name}.part")
+        partial_size = part.stat().st_size if part.is_file() else 0
+        missing += max(0, expected_size - min(partial_size, expected_size))
+    return missing, unknown
+
+
+def ensure_disk_capacity(entries, root, headroom_gb, disk_usage=shutil.disk_usage):
+    """Fail before starting parallel downloads when /workspace is undersized."""
+    root.mkdir(parents=True, exist_ok=True)
+    missing, unknown = missing_download_bytes(entries, root)
+    free = disk_usage(root).free
+    headroom = max(0, int(headroom_gb * DECIMAL_GB))
+    required = missing + headroom
+    print(
+        "DISK PREFLIGHT: "
+        f"path={root} free={free / DECIMAL_GB:.2f} GB "
+        f"download_remaining={missing / DECIMAL_GB:.2f} GB "
+        f"headroom={headroom / DECIMAL_GB:.2f} GB"
+    )
+    if unknown:
+        print(
+            "WARN disk estimate excludes assets without size metadata: "
+            + ", ".join(unknown),
+            file=sys.stderr,
+        )
+    if free < required:
+        raise RuntimeError(
+            "insufficient /workspace capacity before download: "
+            f"{required / DECIMAL_GB:.2f} GB required "
+            f"({missing / DECIMAL_GB:.2f} GB models + "
+            f"{headroom / DECIMAL_GB:.2f} GB headroom), "
+            f"but only {free / DECIMAL_GB:.2f} GB is free at {root}. "
+            "Increase the RunPod Volume Disk and redeploy. "
+            "No asset download was started."
+        )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", required=True)
@@ -491,6 +559,16 @@ def main():
         default=int(os.environ.get("HF_SNAPSHOT_WORKERS", "8")),
     )
     parser.add_argument("--no-hf-xet", action="store_true")
+    parser.add_argument(
+        "--disk-headroom-gb",
+        type=float,
+        default=float(os.environ.get("MODEL_DISK_HEADROOM_GB", "12")),
+    )
+    parser.add_argument(
+        "--skip-disk-check",
+        action="store_true",
+        default=os.environ.get("MODEL_DISK_PREFLIGHT", "1") != "1",
+    )
     args = parser.parse_args()
 
     manifest_path = pathlib.Path(args.manifest)
@@ -539,6 +617,11 @@ def main():
         for entry in ordered_entries:
             provision(entry)
         return
+
+    if not args.skip_disk_check:
+        ensure_disk_capacity(entries, root, args.disk_headroom_gb)
+    else:
+        print("WARN: disk preflight disabled.", file=sys.stderr)
 
     worker_count = max(1, min(args.workers, len(ordered_entries)))
     print(

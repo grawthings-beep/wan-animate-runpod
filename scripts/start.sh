@@ -31,6 +31,9 @@ export HF_XET_CACHE="${HF_XET_CACHE:-${HF_HOME}/xet}"
 # pod; the downloader will still use the normal Xet engine.
 export HF_XET_HIGH_PERFORMANCE="${HF_XET_HIGH_PERFORMANCE:-1}"
 export HF_XET_NUM_CONCURRENT_RANGE_GETS="${HF_XET_NUM_CONCURRENT_RANGE_GETS:-64}"
+# One-shot Pod downloads do not benefit from Xet's chunk cache. Keeping it
+# disabled is both faster and avoids consuming another 10 GB on /workspace.
+export HF_XET_CHUNK_CACHE_SIZE_BYTES="${HF_XET_CHUNK_CACHE_SIZE_BYTES:-0}"
 export HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-300}"
 export TORCH_HOME="${TORCH_HOME:-/workspace/.cache/torch}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/.cache}"
@@ -56,6 +59,17 @@ mkdir -p \
   "${HF_HOME}" \
   "${HF_XET_CACHE}" \
   "${TORCH_HOME}"
+
+# A broken RunPod host can expose the GPU through nvidia-smi while every CUDA
+# call fails. Detect that before paying the time and bandwidth for 40+ GB.
+if [[ "${CUDA_PREFLIGHT:-1}" == "1" ]]; then
+  "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/gpu_preflight.py \
+    --python "${PYTHON_BIN}" \
+    --timeout "${CUDA_READY_TIMEOUT:-90}" \
+    --interval "${CUDA_READY_INTERVAL:-10}"
+else
+  echo "WARN: GPU preflight disabled (CUDA_PREFLIGHT=${CUDA_PREFLIGHT:-0})." >&2
+fi
 
 write_extra_model_paths() {
   local target="$1"
@@ -187,6 +201,7 @@ if [[ "${RUN_DEP_CHECK:-1}" == "1" ]]; then
     --manifest "${MODEL_MANIFEST}" \
     --profile "${MODEL_PROFILE}" \
     --model-root "${MODEL_ROOT}" \
+    --require-cuda \
     "${CHECK_ARGS[@]}"
 fi
 

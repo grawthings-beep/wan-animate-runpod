@@ -43,19 +43,26 @@ def main(argv=None):
     parser.add_argument("--profile", required=True)
     parser.add_argument("--model-root", default="/workspace/comfyui")
     parser.add_argument("--strict", action="store_true")
+    parser.add_argument("--require-cuda", action="store_true")
     args = parser.parse_args(argv)
 
+    cuda_ready = False
     try:
         import torch
 
+        cuda_ready = torch.cuda.is_available()
         print(
             f"[check_env] torch={torch.__version__} "
-            f"cuda_available={torch.cuda.is_available()}"
+            f"cuda_available={cuda_ready}"
         )
-        if torch.cuda.is_available():
+        if cuda_ready:
+            probe = torch.ones(1, device="cuda")
+            probe.add_(1)
+            torch.cuda.synchronize()
             print(f"[check_env] device={torch.cuda.get_device_name(0)}")
     except Exception as exc:  # noqa: BLE001
-        print(f"[check_env] torch import failed: {exc}")
+        cuda_ready = False
+        print(f"[check_env] CUDA check failed: {exc}")
 
     manifest = json.loads(pathlib.Path(args.manifest).read_text(encoding="utf-8"))
     root = pathlib.Path(args.model_root)
@@ -76,6 +83,9 @@ def main(argv=None):
         f"optional_missing={len(optional_missing)}"
     )
     if required_missing and args.strict:
+        return 1
+    if args.require_cuda and not cuda_ready:
+        print("[check_env] ERROR CUDA is required but unavailable", file=sys.stderr)
         return 1
     return 0
 
