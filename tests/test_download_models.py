@@ -193,6 +193,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "i2v",
                 "lightx-i2v",
                 "loop-nsfw-loras",
+                "loop-xxx-loras",
                 "rife49",
             },
         )
@@ -201,7 +202,7 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 9)
+        self.assertEqual(len(selected), 11)
         self.assertIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
             selected,
@@ -213,6 +214,32 @@ class DownloadModelsTests(unittest.TestCase):
                 selected
             )
         )
+        self.assertTrue(
+            {
+                "SmoothXXXAnimation_High.safetensors",
+                "SmoothXXXAnimation_Low.safetensors",
+            }.issubset(selected)
+        )
+
+    def test_loop_xxx_loras_use_hugging_face_backup(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        entries = [
+            entry for entry in manifest["models"] if entry["group"] == "loop-xxx-loras"
+        ]
+        self.assertEqual(len(entries), 2)
+        self.assertTrue(
+            all(
+                entry["url"].startswith(
+                    "https://huggingface.co/uwgm/nikke-civitai-backup/resolve/main/"
+                )
+                for entry in entries
+            )
+        )
+        self.assertTrue(all(entry.get("requires_env") == ["HF_TOKEN"] for entry in entries))
 
     def test_loop_workflow_declares_compatible_profile(self):
         import json

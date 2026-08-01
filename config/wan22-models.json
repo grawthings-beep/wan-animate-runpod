@@ -4,15 +4,15 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
     "loop-quality": {
-      "description": "Lean, silent first/last-frame loop workspace. Includes only the connected SmoothMix I2V pair, the author's active LightX2V rank128 LoRA, CLIP/VAE/text encoder, and interpolation models.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "rife49"]
+      "description": "Lean, silent first/last-frame loop workspace. Includes the connected SmoothMix I2V pair, active LightX2V rank128 accelerator, NSFW-22 and SmoothXXXAnimation High/Low LoRA pairs, CLIP/VAE/text encoder, and RIFE.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -212,25 +212,21 @@
     },
     {
       "name": "SmoothMix XXX Animations High LoRA",
-      "group": "smoothmix-loras",
-      "url": "https://civitai.com/api/download/models/2376136",
+      "group": "loop-xxx-loras",
+      "url": "https://huggingface.co/uwgm/nikke-civitai-backup/resolve/main/SmoothXXXAnimation_High.safetensors",
       "path": "models/loras/SmoothXXXAnimation_High.safetensors",
       "size_bytes": 306807280,
       "sha256": "eac4f4341008abb00434d08fed1d4fda4a144bc94cd26b4819f629f930a75181",
-      "requires_env": ["CIVITAI_API_TOKEN"],
-      "auth_query_env": "CIVITAI_API_TOKEN",
-      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+      "requires_env": ["HF_TOKEN"]
     },
     {
       "name": "SmoothMix XXX Animations Low LoRA",
-      "group": "smoothmix-loras",
-      "url": "https://civitai.com/api/download/models/2376143",
+      "group": "loop-xxx-loras",
+      "url": "https://huggingface.co/uwgm/nikke-civitai-backup/resolve/main/SmoothXXXAnimation_Low.safetensors",
       "path": "models/loras/SmoothXXXAnimation_Low.safetensors",
       "size_bytes": 306807280,
       "sha256": "ad50dfc46c765a6ccc36d40e8a5f77ac2db041f68266593add12ac5f5eac2d76",
-      "requires_env": ["CIVITAI_API_TOKEN"],
-      "auth_query_env": "CIVITAI_API_TOKEN",
-      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+      "requires_env": ["HF_TOKEN"]
     },
     {
       "name": "MMAudio large 44k v2 FP16",

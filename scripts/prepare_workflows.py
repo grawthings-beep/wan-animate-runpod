@@ -332,7 +332,8 @@ def patch_loop(aio):
                 3.0,
                 True,
             ),
-            lora("NSFW-22-H-e8.safetensors", 0.25),
+            lora("NSFW-22-H-e8.safetensors", 0.25, True),
+            lora("SmoothXXXAnimation_High.safetensors", 0.5),
         ],
     )
     configure_lora_node(
@@ -343,7 +344,8 @@ def patch_loop(aio):
                 1.5,
                 True,
             ),
-            lora("NSFW-22-L-e8.safetensors", 0.25),
+            lora("NSFW-22-L-e8.safetensors", 0.25, True),
+            lora("SmoothXXXAnimation_Low.safetensors", 0.5),
         ],
     )
 
@@ -357,9 +359,10 @@ def patch_loop(aio):
         "or irreversible actions. Generate 81 frames first; extend only after "
         "the short loop is clean. This preset is deliberately silent so the "
         "audio track cannot introduce a seam.\n\n"
-        "The optional NSFW-22 High/Low LoRAs are downloaded but OFF. Start at "
-        "0.20-0.25 on both sides; high strengths can damage temporal coherence "
-        "when stacked with the active LightX2V accelerator.\n\n"
+        "NSFW-22 High/Low are downloaded and ON at 0.25 on both sides. The "
+        "SmoothXXXAnimation High/Low pair is downloaded and available at 0.5, "
+        "but remains OFF until deliberately enabled. High stacked strengths can "
+        "damage temporal coherence with the active LightX2V accelerator.\n\n"
         + existing_note
     )
     combine = by_id[332].get("widgets_values")

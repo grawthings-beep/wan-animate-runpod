@@ -84,11 +84,11 @@ Logsで次を確認します。
 
 ```text
 [gpu-preflight] READY attempt=1
-MODEL PROFILE: loop-quality (9 assets)
-DISK PREFLIGHT: path=/workspace/comfyui free=... download_remaining=40.32 GB headroom=12.00 GB
+MODEL PROFILE: loop-quality (11 assets)
+DISK PREFLIGHT: path=/workspace/comfyui free=... download_remaining=40.94 GB headroom=12.00 GB
 TRANSFER ENGINE: 4 files in parallel
 ...
-[check_env] profile=loop-quality assets=9 required_missing=0 optional_missing=0
+[check_env] profile=loop-quality assets=11 required_missing=0 optional_missing=0
 ```
 
 `nvidia-smi`がGPUを表示していても、PyTorchの実演算が失敗するRunPodホストがあります。その場合はモデル取得前に次で停止します。
@@ -104,7 +104,7 @@ TRANSFER ENGINE: 4 files in parallel
 Container Imageに指定します。既存PodのStop/Startではイメージが更新されないため、
 Podを作り直してください。ログ先頭の`BUNDLE REVISION`が指定SHAと一致することも確認します。
 
-新規Podは約40.32 GBです。途中でPodを停止しても、同じローカルVolume DiskならHF cacheまたは`.part`から再開します。PodをTerminateした場合は削除され、次の新規Podで再取得します。`required_missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
+新規Podは約40.94 GBです。途中でPodを停止しても、同じローカルVolume DiskならHF cacheまたは`.part`から再開します。PodをTerminateした場合は削除され、次の新規Podで再取得します。`required_missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
 
 ## 5. workflowを開く
 
