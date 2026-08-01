@@ -90,10 +90,10 @@ RunPodは同じ可変Dockerタグをキャッシュする場合があります�
 ループworkflowのLoRA:
 
 - `LightX2V rank128`: 少ないstep数で生成するためのアクセラレータ。High 3.0 / Low 1.5で既定ON
-- `NSFW-22-H/L-e8`: CubeyAIのWAN 2.2 General NSFW v0.08a。High/Lowとも0.25で既定ON
+- `NSFW-22-H/L-e8`: CubeyAIのWAN 2.2 General NSFW v0.08a。High 2.0 / Low 1.0で既定ON
 - `SmoothXXXAnimation High/Low`: SmoothMix用animation LoRA。High/Lowとも0.5で追加済みだが既定OFF
 
-NSFW-22は配布者が約0.9を好むと説明していますが、この6-step＋LightX2V構成では重ね掛けが強くなるため0.25に固定しています。SmoothXXXAnimationもONにする場合はまずHigh/Lowとも0.25〜0.5で試してください。4本はprivate Hugging Face backupから取得するため`HF_TOKEN`が必要です。
+NSFW-22は指定どおりHigh 2.0 / Low 1.0に固定しています。LightX2V High 3.0 / Low 1.5と同時にONです。SmoothXXXAnimationもONにすると重ね掛けがさらに強くなるため、まずHigh/Lowとも0.25〜0.5で試してください。4本はprivate Hugging Face backupから取得するため`HF_TOKEN`が必要です。
 
 ## ワークフロー
 

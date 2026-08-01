@@ -119,7 +119,13 @@ class WorkflowWiringTests(unittest.TestCase):
             },
         )
         nsfw = [item for item in entries if item["lora"].startswith("NSFW-22-")]
-        self.assertEqual({item["strength"] for item in nsfw}, {0.25})
+        self.assertEqual(
+            {item["lora"]: item["strength"] for item in nsfw},
+            {
+                "NSFW-22-H-e8.safetensors": 2.0,
+                "NSFW-22-L-e8.safetensors": 1.0,
+            },
+        )
         smooth_xxx = [
             item for item in entries if item["lora"].startswith("SmoothXXXAnimation_")
         ]
