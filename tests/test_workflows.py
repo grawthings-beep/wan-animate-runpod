@@ -89,7 +89,7 @@ class WorkflowWiringTests(unittest.TestCase):
                 self.assertEqual(sampler["type"], "KSamplerWithNAG (Advanced)")
                 self.assertEqual(sampler["outputs"][0]["type"], "LATENT")
 
-    def test_loop_workflow_has_accelerator_and_optional_nsfw_pair(self):
+    def test_loop_workflow_has_requested_lora_configuration(self):
         graph = self.load(WORKFLOWS[1])
         entries = [
             item
@@ -116,21 +116,36 @@ class WorkflowWiringTests(unittest.TestCase):
                 "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
                 "NSFW-22-H-e8.safetensors",
                 "NSFW-22-L-e8.safetensors",
+                "SmoothXXXAnimation_High.safetensors",
+                "SmoothXXXAnimation_Low.safetensors",
             },
         )
         nsfw = [item for item in entries if item["lora"].startswith("NSFW-22-")]
         self.assertEqual(
             {item["lora"]: item["strength"] for item in nsfw},
             {
-                "NSFW-22-H-e8.safetensors": 2.0,
-                "NSFW-22-L-e8.safetensors": 1.0,
+                "NSFW-22-H-e8.safetensors": 2.75,
+                "NSFW-22-L-e8.safetensors": 1.65,
             },
         )
         smooth_xxx = [
             item for item in entries if item["lora"].startswith("SmoothXXXAnimation_")
         ]
-        self.assertEqual({item["strength"] for item in smooth_xxx}, {0.5})
-        self.assertTrue(all(item["on"] is False for item in smooth_xxx))
+        self.assertEqual(
+            {item["lora"]: item["strength"] for item in smooth_xxx},
+            {
+                "SmoothXXXAnimation_High.safetensors": 1.5,
+                "SmoothXXXAnimation_Low.safetensors": 1.0,
+            },
+        )
+        self.assertTrue(all(item["on"] is True for item in smooth_xxx))
+
+    def test_loop_workflow_uses_requested_resolution(self):
+        graph = self.load(WORKFLOWS[1])
+        node = next(node for node in graph["nodes"] if node["id"] == 328)
+        self.assertEqual(node["properties"]["valueX"], 528)
+        self.assertEqual(node["properties"]["valueY"], 704)
+        self.assertEqual(node["widgets_values"], [528, 528, 704, 704, 0, 0])
 
     def test_loop_workflow_has_no_unused_model_loaders(self):
         graph = self.load(WORKFLOWS[1])

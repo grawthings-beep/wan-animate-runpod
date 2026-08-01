@@ -332,8 +332,8 @@ def patch_loop(aio):
                 3.0,
                 True,
             ),
-            lora("NSFW-22-H-e8.safetensors", 2.0, True),
-            lora("SmoothXXXAnimation_High.safetensors", 0.5),
+            lora("NSFW-22-H-e8.safetensors", 2.75, True),
+            lora("SmoothXXXAnimation_High.safetensors", 1.5, True),
         ],
     )
     configure_lora_node(
@@ -344,10 +344,15 @@ def patch_loop(aio):
                 1.5,
                 True,
             ),
-            lora("NSFW-22-L-e8.safetensors", 1.0, True),
-            lora("SmoothXXXAnimation_Low.safetensors", 0.5),
+            lora("NSFW-22-L-e8.safetensors", 1.65, True),
+            lora("SmoothXXXAnimation_Low.safetensors", 1.0, True),
         ],
     )
+
+    resolution = by_id[328]
+    resolution["properties"]["valueX"] = 528
+    resolution["properties"]["valueY"] = 704
+    resolution["widgets_values"] = [528, 528, 704, 704, 0, 0]
 
     by_id[338]["title"] = "1. SELECT LOOP IMAGE (FIRST FRAME)"
     by_id[342]["title"] = "2. SELECT THE SAME IMAGE (LAST FRAME)"
@@ -359,10 +364,9 @@ def patch_loop(aio):
         "or irreversible actions. Generate 81 frames first; extend only after "
         "the short loop is clean. This preset is deliberately silent so the "
         "audio track cannot introduce a seam.\n\n"
-        "NSFW-22 High/Low are downloaded and ON at 2.0 High / 1.0 Low. The "
-        "SmoothXXXAnimation High/Low pair is downloaded and available at 0.5, "
-        "but remains OFF until deliberately enabled. High stacked strengths can "
-        "damage temporal coherence with the active LightX2V accelerator.\n\n"
+        "All LoRAs are ON: LightX2V 3.0 High / 1.5 Low, NSFW-22 2.75 High / "
+        "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Default base "
+        "resolution is 528 x 704.\n\n"
         + existing_note
     )
     combine = by_id[332].get("widgets_values")
