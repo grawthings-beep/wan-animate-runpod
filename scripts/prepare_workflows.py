@@ -21,6 +21,11 @@ LIGHTNING_SOURCE = (
 OUTPUTS = {
     "aio": ROOT / "workflows" / "wan22_smooth_v6_aio_runpod.json",
     "loop": ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json",
+    "batch10": (
+        ROOT
+        / "workflows"
+        / "wan22_smooth_v6_seamless_loop_batch10_runpod.json"
+    ),
     "lightning": (
         ROOT
         / "workflows"
@@ -128,6 +133,25 @@ def _append_origin_link(graph, link):
         links = []
         output["links"] = links
     links.append(link[0])
+
+
+def append_link(graph, origin_id, origin_slot, target_id, target_slot, link_type):
+    """Append a top-level link and update both serialized node endpoints."""
+    graph["last_link_id"] += 1
+    link_id = graph["last_link_id"]
+    link = [
+        link_id,
+        origin_id,
+        origin_slot,
+        target_id,
+        target_slot,
+        link_type,
+    ]
+    graph["links"].append(link)
+    _append_origin_link(graph, link)
+    target = next(node for node in graph["nodes"] if node["id"] == target_id)
+    target["inputs"][target_slot]["link"] = link_id
+    return link_id
 
 
 def flatten_sampler_subgraphs(graph):
@@ -379,6 +403,250 @@ def patch_loop(aio):
     return graph
 
 
+def _loop_slot_node(node_id, slot_number, position, order):
+    return {
+        "id": node_id,
+        "type": "WanLoopQueueSlot",
+        "pos": list(position),
+        "size": [520, 300],
+        "flags": {},
+        "order": order,
+        "mode": 0,
+        "inputs": [
+            {
+                "name": "image",
+                "type": "COMBO",
+                "widget": {"name": "image"},
+                "link": None,
+            },
+            {
+                "name": "positive_prompt",
+                "type": "STRING",
+                "widget": {"name": "positive_prompt"},
+                "link": None,
+            },
+            {
+                "name": "upload",
+                "type": "IMAGEUPLOAD",
+                "widget": {"name": "upload"},
+                "link": None,
+            },
+        ],
+        "outputs": [
+            {
+                "name": "slot",
+                "type": "WAN_LOOP_QUEUE_SLOT",
+                "links": [],
+            }
+        ],
+        "properties": {
+            "Node name for S&R": "WanLoopQueueSlot",
+            "slot_number": slot_number,
+        },
+        "widgets_values": [
+            "DigitalPastelLogo.png",
+            "",
+            "image",
+        ],
+        "title": f"{slot_number:02d}. IMAGE + POSITIVE PROMPT",
+    }
+
+
+def _loop_selector_node(node_id, position, order):
+    inputs = [
+        {
+            "name": "active_slot",
+            "type": "INT",
+            "widget": {"name": "active_slot"},
+            "link": None,
+        },
+        {
+            "name": "batch_id",
+            "type": "STRING",
+            "widget": {"name": "batch_id"},
+            "link": None,
+        },
+    ]
+    inputs.extend(
+        {
+            "name": f"slot_{number:02d}",
+            "type": "WAN_LOOP_QUEUE_SLOT",
+            "link": None,
+        }
+        for number in range(1, 11)
+    )
+    return {
+        "id": node_id,
+        "type": "WanLoopQueueSelector",
+        "pos": list(position),
+        "size": [520, 500],
+        "flags": {},
+        "order": order,
+        "mode": 0,
+        "inputs": inputs,
+        "outputs": [
+            {"name": "image", "type": "IMAGE", "links": []},
+            {"name": "positive_prompt", "type": "STRING", "links": []},
+            {"name": "filename_prefix", "type": "STRING", "links": []},
+            {
+                "name": "context",
+                "type": "WAN_LOOP_QUEUE_CONTEXT",
+                "links": [],
+            },
+        ],
+        "properties": {"Node name for S&R": "WanLoopQueueSelector"},
+        "widgets_values": [1, "increment", "click-queue-10-button"],
+        "title": "QUEUE 10 LOOPS — ONE JOB AT A TIME",
+    }
+
+
+def _loop_finalizer_node(node_id, position, order):
+    return {
+        "id": node_id,
+        "type": "WanLoopBatchFinalize",
+        "pos": list(position),
+        "size": [440, 180],
+        "flags": {},
+        "order": order,
+        "mode": 0,
+        "inputs": [
+            {"name": "filenames", "type": "VHS_FILENAMES", "link": None},
+            {
+                "name": "context",
+                "type": "WAN_LOOP_QUEUE_CONTEXT",
+                "link": None,
+            },
+            {
+                "name": "expected_count",
+                "type": "INT",
+                "widget": {"name": "expected_count"},
+                "link": None,
+            },
+        ],
+        "outputs": [{"name": "status", "type": "STRING", "links": None}],
+        "properties": {"Node name for S&R": "WanLoopBatchFinalize"},
+        "widgets_values": [10],
+        "title": "ZIP + AUTO DOWNLOAD AFTER #10",
+    }
+
+
+def patch_loop_batch10(loop):
+    """Create ten independent sequential queue jobs from one loop graph."""
+    graph = copy.deepcopy(loop)
+    remove_nodes(graph, {333, 338, 342})
+
+    referenced_types = {node.get("type") for node in graph["nodes"]}
+    definitions = graph.get("definitions", {}).get("subgraphs", [])
+    graph["definitions"]["subgraphs"] = [
+        item for item in definitions if item["id"] in referenced_types
+    ]
+
+    graph["groups"] = [
+        group for group in graph.get("groups", []) if group["id"] not in {39, 44, 48}
+    ]
+    main_group = next(group for group in graph["groups"] if group["id"] == 36)
+    main_group["bounding"] = [-5240, 2299, 7060, 4150]
+
+    first_id = graph["last_node_id"] + 1
+    slot_ids = list(range(first_id, first_id + 10))
+    selector_id = first_id + 10
+    finalizer_id = first_id + 11
+    next_order = max(node.get("order", 0) for node in graph["nodes"]) + 1
+
+    for index, node_id in enumerate(slot_ids):
+        column = index % 2
+        row = index // 2
+        graph["nodes"].append(
+            _loop_slot_node(
+                node_id,
+                index + 1,
+                (-5160 + column * 560, 3020 + row * 650),
+                next_order + index,
+            )
+        )
+    graph["nodes"].append(
+        _loop_selector_node(selector_id, (-4020, 3020), next_order + 10)
+    )
+    graph["nodes"].append(
+        _loop_finalizer_node(finalizer_id, (1400, 3020), next_order + 11)
+    )
+    graph["last_node_id"] = finalizer_id
+
+    for index, slot_id in enumerate(slot_ids):
+        append_link(
+            graph,
+            slot_id,
+            0,
+            selector_id,
+            index + 2,
+            "WAN_LOOP_QUEUE_SLOT",
+        )
+
+    # The selected image is reused as both ends of the seamless loop, so there
+    # is no visual jump caused by re-inserting a different first frame.
+    for target_id, target_slot in ((352, 1), (350, 1), (343, 5), (343, 6)):
+        append_link(graph, selector_id, 0, target_id, target_slot, "IMAGE")
+    append_link(graph, selector_id, 1, 305, 0, "STRING")
+    append_link(graph, selector_id, 2, 332, 6, "STRING")
+    append_link(
+        graph,
+        selector_id,
+        3,
+        finalizer_id,
+        1,
+        "WAN_LOOP_QUEUE_CONTEXT",
+    )
+    append_link(graph, 332, 0, finalizer_id, 0, "VHS_FILENAMES")
+
+    graph["groups"].extend(
+        [
+            {
+                "id": 53,
+                "title": "10 IMAGES + 10 POSITIVE PROMPTS",
+                "bounding": [-5210, 2920, 1110, 3440],
+                "color": "#3f789e",
+                "flags": {},
+            },
+            {
+                "id": 54,
+                "title": "SEQUENTIAL QUEUE CONTROL",
+                "bounding": [-4070, 2920, 620, 620],
+                "color": "#5b4ca3",
+                "flags": {},
+            },
+            {
+                "id": 55,
+                "title": "ZIP DOWNLOAD AFTER ALL 10",
+                "bounding": [1360, 2920, 500, 300],
+                "color": "#2f855a",
+                "flags": {},
+            },
+        ]
+    )
+
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    by_id[323]["widgets_values"] = (
+        "10-LOOP SEQUENTIAL QUEUE\n\n"
+        "1. Select one image and enter its matching positive prompt in every "
+        "slot from 01 to 10.\n2. Press QUEUE 10 LOOPS (SEQUENTIAL) once.\n"
+        "3. ComfyUI creates ten separate jobs. Only one loop occupies VRAM at "
+        "a time.\n4. After job 10 succeeds, the browser downloads one ZIP with "
+        "slot-01.mp4 through slot-10.mp4 plus manifest.json.\n\n"
+        "Do not use the normal Queue button for this preset. A failed earlier "
+        "job intentionally prevents an incomplete ZIP from downloading."
+    )
+    bundle = graph.setdefault("extra", {}).setdefault("runpod_bundle", {})
+    bundle.update(
+        {
+            "preset": "seamless-loop-batch10-sequential",
+            "profile": "loop-quality",
+            "queue_jobs": 10,
+            "auto_download": "zip-after-final-job",
+        }
+    )
+    return graph
+
+
 def patch_lightning(graph):
     graph = replace_model_names(graph)
 
@@ -491,9 +759,11 @@ def main():
         LIGHTNING_SOURCE.read_text(encoding="utf-8-sig")
     )
     aio = patch_aio(smooth_source)
+    loop = patch_loop(aio)
     generated = {
         "aio": encode(aio),
-        "loop": encode(patch_loop(aio)),
+        "loop": encode(loop),
+        "batch10": encode(patch_loop_batch10(loop)),
         "lightning": encode(patch_lightning(lightning_source)),
     }
 

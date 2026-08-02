@@ -31,6 +31,7 @@ COPY custom_nodes.txt /opt/runpod-wan-animate/custom_nodes.txt
 COPY config/ /opt/runpod-wan-animate/config/
 COPY scripts/ /opt/runpod-wan-animate/scripts/
 COPY workflows/ /opt/runpod-wan-animate/workflows/
+COPY custom_nodes/ /opt/comfyui-baked/custom_nodes/
 
 # Keep the transfer stack isolated from ComfyUI's Python dependencies.  The
 # current Hugging Face client automatically uses the Rust hf_xet backend.

@@ -180,6 +180,12 @@ def main():
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     dependencies = json.loads(DEPENDENCIES_PATH.read_text(encoding="utf-8"))
     installed_packs = read_custom_node_names(errors)
+    bundled_packs = dependencies.get("bundled_custom_node_packs") or []
+    for pack in bundled_packs:
+        package = ROOT / "custom_nodes" / pack
+        if not (package / "__init__.py").is_file():
+            errors.append(f"bundled custom-node pack is missing: {pack}")
+        installed_packs.add(pack)
     provided, basename_groups = validate_manifest(manifest, errors)
     validate_workflows(
         provided,

@@ -1,4 +1,7 @@
 {
+  "bundled_custom_node_packs": [
+    "ComfyUI-WanLoopBatch"
+  ],
   "core_node_types": [
     "CLIPLoader",
     "CLIPTextEncode",
@@ -58,6 +61,9 @@
     "VHS_LoadVideo": "ComfyUI-VideoHelperSuite",
     "VHS_VideoCombine": "ComfyUI-VideoHelperSuite",
     "VHS_VideoInfo": "ComfyUI-VideoHelperSuite",
+    "WanLoopBatchFinalize": "ComfyUI-WanLoopBatch",
+    "WanLoopQueueSelector": "ComfyUI-WanLoopBatch",
+    "WanLoopQueueSlot": "ComfyUI-WanLoopBatch",
     "easy cleanGpuUsed": "ComfyUI-Easy-Use",
     "mxSlider2D": "ComfyUI-mxToolkit"
   }

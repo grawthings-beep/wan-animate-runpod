@@ -25,8 +25,9 @@ jobs:
         run: |
           python scripts/prepare_workflows.py --check
           python scripts/validate_assets.py
-          python -m compileall -q scripts tests
+          python -m compileall -q scripts tests custom_nodes
           python -m unittest discover -s tests -v
+          node --check custom_nodes/ComfyUI-WanLoopBatch/web/wan_loop_batch.js
           bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh
 
   build:

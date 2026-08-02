@@ -7,6 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 WORKFLOWS = (
     ROOT / "workflows" / "wan22_smooth_v6_aio_runpod.json",
     ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json",
+    ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_batch10_runpod.json",
 )
 LIGHTNING = (
     ROOT / "workflows" / "wan22_native_enhanced_lightning_longvideo_runpod.json"
@@ -32,6 +33,10 @@ class WorkflowWiringTests(unittest.TestCase):
                 329: "KSamplerAdvanced",
                 330: "KSamplerWithNAG (Advanced)",
             },
+            WORKFLOWS[2]: {
+                329: "KSamplerAdvanced",
+                330: "KSamplerWithNAG (Advanced)",
+            },
         }
         for path, expected in expected_by_path.items():
             with self.subTest(path=path.name):
@@ -46,6 +51,7 @@ class WorkflowWiringTests(unittest.TestCase):
         node_ids_by_path = {
             WORKFLOWS[0]: (237, 330),
             WORKFLOWS[1]: (330,),
+            WORKFLOWS[2]: (330,),
         }
         for path, node_ids in node_ids_by_path.items():
             with self.subTest(path=path.name):
@@ -141,18 +147,84 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertTrue(all(item["on"] is True for item in smooth_xxx))
 
     def test_loop_workflow_uses_requested_resolution(self):
-        graph = self.load(WORKFLOWS[1])
-        node = next(node for node in graph["nodes"] if node["id"] == 328)
-        self.assertEqual(node["properties"]["valueX"], 528)
-        self.assertEqual(node["properties"]["valueY"], 704)
-        self.assertEqual(node["widgets_values"], [528, 528, 704, 704, 0, 0])
+        for path in WORKFLOWS[1:]:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                node = next(node for node in graph["nodes"] if node["id"] == 328)
+                self.assertEqual(node["properties"]["valueX"], 528)
+                self.assertEqual(node["properties"]["valueY"], 704)
+                self.assertEqual(node["widgets_values"], [528, 528, 704, 704, 0, 0])
 
     def test_loop_workflow_has_no_unused_model_loaders(self):
-        graph = self.load(WORKFLOWS[1])
-        types = {node["type"] for node in graph["nodes"]}
-        self.assertNotIn("UnetLoaderGGUF", types)
-        self.assertNotIn("MMAudioModelLoader", types)
-        self.assertNotIn("MMAudioFeatureUtilsLoader", types)
+        for path in WORKFLOWS[1:]:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                types = {node["type"] for node in graph["nodes"]}
+                self.assertNotIn("UnetLoaderGGUF", types)
+                self.assertNotIn("MMAudioModelLoader", types)
+                self.assertNotIn("MMAudioFeatureUtilsLoader", types)
+
+    def test_batch10_is_ten_separate_queue_slots(self):
+        graph = self.load(WORKFLOWS[2])
+        nodes = graph["nodes"]
+        slots = [node for node in nodes if node["type"] == "WanLoopQueueSlot"]
+        selectors = [
+            node for node in nodes if node["type"] == "WanLoopQueueSelector"
+        ]
+        finalizers = [
+            node for node in nodes if node["type"] == "WanLoopBatchFinalize"
+        ]
+        self.assertEqual(len(slots), 10)
+        self.assertEqual(len(selectors), 1)
+        self.assertEqual(len(finalizers), 1)
+        self.assertEqual(selectors[0]["widgets_values"][:2], [1, "increment"])
+        self.assertEqual(finalizers[0]["widgets_values"], [10])
+        self.assertEqual(
+            graph["extra"]["runpod_bundle"]["preset"],
+            "seamless-loop-batch10-sequential",
+        )
+        self.assertEqual(graph["extra"]["runpod_bundle"]["queue_jobs"], 10)
+
+    def test_batch10_reuses_one_selected_image_at_both_loop_ends(self):
+        graph = self.load(WORKFLOWS[2])
+        by_id = {node["id"]: node for node in graph["nodes"]}
+        links = {link[0]: link for link in graph["links"]}
+        self.assertNotIn(333, by_id)
+        self.assertNotIn(338, by_id)
+        self.assertNotIn(342, by_id)
+
+        selector = next(
+            node for node in graph["nodes"] if node["type"] == "WanLoopQueueSelector"
+        )
+        selector_id = selector["id"]
+        image_targets = {
+            (link[3], link[4])
+            for link in graph["links"]
+            if link[1:3] == [selector_id, 0]
+        }
+        self.assertEqual(image_targets, {(352, 1), (350, 1), (343, 5), (343, 6)})
+
+        prompt_link = links[by_id[305]["inputs"][0]["link"]]
+        prefix_link = links[by_id[332]["inputs"][6]["link"]]
+        self.assertEqual(prompt_link[1:3], [selector_id, 1])
+        self.assertEqual(prefix_link[1:3], [selector_id, 2])
+        self.assertEqual(by_id[343]["widgets_values"][3], 1)
+
+    def test_batch10_finalizer_is_downstream_of_saved_video(self):
+        graph = self.load(WORKFLOWS[2])
+        by_id = {node["id"]: node for node in graph["nodes"]}
+        links = {link[0]: link for link in graph["links"]}
+        finalizer = next(
+            node for node in graph["nodes"] if node["type"] == "WanLoopBatchFinalize"
+        )
+        selector = next(
+            node for node in graph["nodes"] if node["type"] == "WanLoopQueueSelector"
+        )
+        filenames_link = links[finalizer["inputs"][0]["link"]]
+        context_link = links[finalizer["inputs"][1]["link"]]
+        self.assertEqual(by_id[filenames_link[1]]["type"], "VHS_VideoCombine")
+        self.assertEqual(filenames_link[2], 0)
+        self.assertEqual(context_link[1:3], [selector["id"], 3])
 
     def test_lightning_models_are_normalized_to_manifest_names(self):
         graph = self.load(LIGHTNING)

@@ -30,6 +30,16 @@ class ContainerContractTests(unittest.TestCase):
         probe_at = start.index("gpu_preflight.py")
         self.assertLess(normalize_at, probe_at)
 
+    def test_bundled_loop_queue_nodes_are_copied_into_comfyui(self):
+        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+        package = ROOT / "custom_nodes" / "ComfyUI-WanLoopBatch"
+
+        self.assertIn(
+            "COPY custom_nodes/ /opt/comfyui-baked/custom_nodes/", dockerfile
+        )
+        self.assertTrue((package / "__init__.py").is_file())
+        self.assertTrue((package / "web" / "wan_loop_batch.js").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

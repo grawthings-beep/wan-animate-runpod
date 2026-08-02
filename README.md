@@ -1,11 +1,19 @@
 # WAN 2.2 ComfyUI on RunPod
 
+## 10本を順番に生成してZIPを自動ダウンロード
+
+`wan22_smooth_v6_seamless_loop_batch10_runpod` は、10枚の画像と10個の対応するpositive promptを登録できる派生ワークフローです。専用の `QUEUE 10 LOOPS (SEQUENTIAL)` ボタンを1回押すと、通常のループ生成を独立した10件のComfyUIジョブとして順番に登録します。同時バッチではないため、1本が終了してVRAMを解放してから次の1本へ進みます。
+
+10本目まで成功すると、`slot-01.mp4` から `slot-10.mp4` と `manifest.json` を含むZIPをブラウザが自動ダウンロードします。途中のジョブが失敗した場合は、不完全なZIPを誤ってダウンロードしません。サーバー側にも `/workspace/comfyui/output/Video/loop-batches/<batch-id>/` が残ります。
+
+使い方は [BATCH10_WORKFLOW.md](BATCH10_WORKFLOW.md) を参照してください。
+
 RunPodで次の2系統をそのまま開けるComfyUIイメージです。
 
 - Smooth Workflow v6.0: I2V / T2V / First-to-Last Frame / MMAudio / シームレスループ
 - Native Enhanced Lightning Long Video: 5〜20秒の連続I2V、RIFE 60fps化、2倍アップスケール
 
-ワークフロー、18個のcustom-node pack、モデル/LoRA manifestを同じcommitで固定しています。Network Volumeは不要です。新しいPodではローカルVolume Diskへモデルを高速取得し、同じPodをStop/Startした場合だけ検証済みファイルと途中ダウンロードを再利用します。PodをTerminateすればVolume Diskも削除され、次のPodでは最初から取得します。
+ワークフロー、18個の外部custom-node pack、1個の同梱batchノード、モデル/LoRA manifestを同じcommitで固定しています。Network Volumeは不要です。新しいPodではローカルVolume Diskへモデルを高速取得し、同じPodをStop/Startした場合だけ検証済みファイルと途中ダウンロードを再利用します。PodをTerminateすればVolume Diskも削除され、次のPodでは最初から取得します。
 
 ## コンテナイメージ
 
@@ -103,6 +111,7 @@ RunPodは同じ可変Dockerタグをキャッシュする場合があります�
 - `wan22_native_enhanced_lightning_longvideo_runpod`
 - `wan22_smooth_v6_aio_runpod`
 - `wan22_smooth_v6_seamless_loop_runpod`
+- `wan22_smooth_v6_seamless_loop_batch10_runpod`
 
 ループ版の流れ:
 
