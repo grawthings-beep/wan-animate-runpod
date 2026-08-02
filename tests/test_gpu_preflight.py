@@ -13,6 +13,19 @@ SPEC.loader.exec_module(GPU_PREFLIGHT)
 
 
 class GpuPreflightTests(unittest.TestCase):
+    def test_pinned_torch_stack_is_required(self):
+        torch_stack = mock.Mock(
+            returncode=1,
+            stdout="",
+            stderr="RuntimeError: incompatible pinned torch stack",
+        )
+
+        result = GPU_PREFLIGHT.probe_torch_stack("python", runner=mock.Mock(return_value=torch_stack))
+
+        self.assertFalse(result.ready)
+        self.assertFalse(result.retryable)
+        self.assertIn("incompatible pinned torch stack", result.diagnostic)
+
     def test_real_cuda_operation_is_required(self):
         nvidia = mock.Mock(
             returncode=0,
@@ -50,6 +63,40 @@ class GpuPreflightTests(unittest.TestCase):
         self.assertTrue(ready)
         self.assertIn("RTX 4090", diagnostic)
         self.assertIn('"torch_cuda": "12.8"', diagnostic)
+
+    def test_old_5090_driver_is_rejected_without_retry(self):
+        nvidia = mock.Mock(
+            returncode=0,
+            stdout="NVIDIA GeForce RTX 5090, GPU-123, 32607 MiB, 565.77\n",
+            stderr="",
+        )
+        runner = mock.Mock(return_value=nvidia)
+
+        result = GPU_PREFLIGHT.probe_once("python", runner=runner)
+
+        self.assertFalse(result.ready)
+        self.assertFalse(result.retryable)
+        self.assertIn("incompatible Blackwell driver", result.diagnostic)
+        runner.assert_called_once()
+
+    def test_current_5090_driver_reaches_real_cuda_probe(self):
+        nvidia = mock.Mock(
+            returncode=0,
+            stdout="NVIDIA GeForce RTX 5090, GPU-123, 32607 MiB, 580.159.03\n",
+            stderr="",
+        )
+        torch_probe = mock.Mock(
+            returncode=0,
+            stdout='{"torch": "2.10.0+cu128", "torch_cuda": "12.8", "device": "RTX 5090"}\n',
+            stderr="",
+        )
+        runner = mock.Mock(side_effect=[nvidia, torch_probe])
+
+        result = GPU_PREFLIGHT.probe_once("python", runner=runner)
+
+        self.assertTrue(result.ready)
+        self.assertTrue(result.retryable)
+        self.assertEqual(runner.call_count, 2)
 
 
 if __name__ == "__main__":

@@ -2,10 +2,48 @@
 """Fail fast when a RunPod host exposes NVML but cannot run CUDA."""
 
 import argparse
+import csv
+import io
 import os
+import re
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
+
+
+MIN_BLACKWELL_DRIVER = (570, 26)
+
+
+TORCH_STACK_PROBE = r"""
+import json
+import os
+
+import torch
+import torchaudio
+import torchvision
+
+actual = {
+    "torch": torch.__version__,
+    "torchvision": torchvision.__version__,
+    "torchaudio": torchaudio.__version__,
+    "torch_cuda": torch.version.cuda,
+}
+expected = {
+    "torch": os.environ.get("EXPECTED_TORCH_VERSION", ""),
+    "torchvision": os.environ.get("EXPECTED_TORCHVISION_VERSION", ""),
+    "torchaudio": os.environ.get("EXPECTED_TORCHAUDIO_VERSION", ""),
+    "torch_cuda": os.environ.get("EXPECTED_TORCH_CUDA", ""),
+}
+mismatches = {
+    key: {"expected": value, "actual": actual.get(key)}
+    for key, value in expected.items()
+    if value and actual.get(key) != value
+}
+if mismatches:
+    raise RuntimeError("incompatible pinned torch stack: " + json.dumps(mismatches))
+print(json.dumps(actual))
+"""
 
 
 CUDA_PROBE = r"""
@@ -32,11 +70,76 @@ print(json.dumps({
 """
 
 
+@dataclass(frozen=True)
+class ProbeResult:
+    ready: bool
+    diagnostic: str
+    retryable: bool = True
+
+    # Keep two-value unpacking convenient for callers and existing tests.
+    def __iter__(self):
+        yield self.ready
+        yield self.diagnostic
+
+
 def _result_text(result):
     output = "\n".join(
         item.strip() for item in (result.stdout or "", result.stderr or "") if item.strip()
     )
     return output[-2000:] if output else f"exit code {result.returncode}"
+
+
+def _version_tuple(value):
+    match = re.match(r"^(\d+)\.(\d+)", value.strip())
+    return tuple(map(int, match.groups())) if match else None
+
+
+def _incompatible_blackwell_driver(gpu_summary):
+    """Return a diagnostic when an RTX 5090/Blackwell host driver is too old."""
+    try:
+        rows = list(csv.reader(io.StringIO(gpu_summary)))
+    except csv.Error:
+        return None
+
+    for row in rows:
+        if len(row) < 4:
+            continue
+        name = row[0].strip()
+        driver = row[3].strip()
+        is_blackwell = bool(
+            re.search(r"RTX\s+50\d{2}", name, re.IGNORECASE)
+            or re.search(r"\bBlackwell\b|\bB200\b|\bB300\b|\bGB200\b", name, re.IGNORECASE)
+        )
+        parsed = _version_tuple(driver)
+        if is_blackwell and parsed and parsed < MIN_BLACKWELL_DRIVER:
+            minimum = ".".join(map(str, MIN_BLACKWELL_DRIVER))
+            return (
+                f"incompatible Blackwell driver: GPU={name} driver={driver}; "
+                f"CUDA 12.8 requires an NVIDIA R570 driver ({minimum}+) for this GPU"
+            )
+    return None
+
+
+def probe_torch_stack(python_bin, runner=subprocess.run):
+    """Verify that custom-node installs did not replace the pinned cu128 stack."""
+    try:
+        result = runner(
+            [python_bin, "-c", TORCH_STACK_PROBE],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return ProbeResult(False, f"PyTorch stack probe could not run: {exc}", False)
+
+    if result.returncode != 0:
+        return ProbeResult(
+            False,
+            f"PyTorch/TorchVision/TorchAudio stack validation failed:\n{_result_text(result)}",
+            False,
+        )
+    return ProbeResult(True, _result_text(result), False)
 
 
 def probe_once(python_bin, runner=subprocess.run):
@@ -54,12 +157,16 @@ def probe_once(python_bin, runner=subprocess.run):
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, f"nvidia-smi could not run: {exc}"
+        return ProbeResult(False, f"nvidia-smi could not run: {exc}")
 
     if nvidia.returncode != 0:
-        return False, f"nvidia-smi failed: {_result_text(nvidia)}"
+        return ProbeResult(False, f"nvidia-smi failed: {_result_text(nvidia)}")
 
     gpu_summary = (nvidia.stdout or "").strip()
+    incompatible_driver = _incompatible_blackwell_driver(gpu_summary)
+    if incompatible_driver:
+        return ProbeResult(False, incompatible_driver, False)
+
     try:
         cuda = runner(
             [python_bin, "-c", CUDA_PROBE],
@@ -69,15 +176,21 @@ def probe_once(python_bin, runner=subprocess.run):
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, f"GPU visible through nvidia-smi ({gpu_summary}); CUDA probe failed: {exc}"
+        return ProbeResult(
+            False,
+            f"GPU visible through nvidia-smi ({gpu_summary}); CUDA probe failed: {exc}",
+        )
 
     if cuda.returncode != 0:
-        return (
+        return ProbeResult(
             False,
             "GPU visible through nvidia-smi "
             f"({gpu_summary}); PyTorch CUDA probe failed:\n{_result_text(cuda)}",
         )
-    return True, f"nvidia-smi={gpu_summary}\ntorch_cuda={_result_text(cuda)}"
+    return ProbeResult(
+        True,
+        f"nvidia-smi={gpu_summary}\ntorch_cuda={_result_text(cuda)}",
+    )
 
 
 def run_preflight(python_bin, timeout_seconds, interval_seconds, runner=subprocess.run):
@@ -86,20 +199,20 @@ def run_preflight(python_bin, timeout_seconds, interval_seconds, runner=subproce
     last_diagnostic = "probe was not run"
     while True:
         attempt += 1
-        ready, diagnostic = probe_once(python_bin, runner=runner)
-        if ready:
+        result = probe_once(python_bin, runner=runner)
+        if result.ready:
             print(f"[gpu-preflight] READY attempt={attempt}")
-            print(f"[gpu-preflight] {diagnostic}")
+            print(f"[gpu-preflight] {result.diagnostic}")
             return True
 
-        last_diagnostic = diagnostic
+        last_diagnostic = result.diagnostic
         remaining = deadline - time.monotonic()
         print(
             f"[gpu-preflight] attempt={attempt} failed; "
-            f"retry_budget={max(0, int(remaining))}s\n{diagnostic}",
+            f"retry_budget={max(0, int(remaining))}s\n{result.diagnostic}",
             file=sys.stderr,
         )
-        if remaining <= 0:
+        if not result.retryable or remaining <= 0:
             break
         time.sleep(min(max(0.1, interval_seconds), remaining))
 
@@ -118,6 +231,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument(
+        "--stack-only",
+        action="store_true",
+        help="validate the pinned torch stack without requiring a GPU",
+    )
+    parser.add_argument(
         "--timeout",
         type=float,
         default=float(os.environ.get("CUDA_READY_TIMEOUT", "90")),
@@ -129,6 +247,20 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
+    stack = probe_torch_stack(args.python)
+    if not stack.ready:
+        print(
+            "[gpu-preflight] FATAL: incompatible PyTorch runtime.\n"
+            "The image build or a custom-node dependency replaced the pinned "
+            "CUDA 12.8 wheel family. Do not download models with this image.\n"
+            f"{stack.diagnostic}",
+            file=sys.stderr,
+        )
+        return 87
+    print(f"[gpu-preflight] TORCH STACK READY {stack.diagnostic}")
+    if args.stack_only:
+        return 0
+
     context = {
         key: os.environ.get(key, "<unset>")
         for key in (
@@ -137,6 +269,8 @@ def main(argv=None):
             "RUNPOD_POD_HOSTNAME",
             "RUNPOD_GPU_COUNT",
             "CUDA_VISIBLE_DEVICES",
+            "NVIDIA_VISIBLE_DEVICES",
+            "PIP_CONSTRAINT",
         )
     }
     print(

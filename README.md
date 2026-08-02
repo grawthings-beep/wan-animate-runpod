@@ -49,6 +49,7 @@ HF_XET_HIGH_PERFORMANCE=1
 HF_XET_NUM_CONCURRENT_RANGE_GETS=64
 HF_XET_CHUNK_CACHE_SIZE_BYTES=0
 HF_HUB_DOWNLOAD_TIMEOUT=300
+CUDA_NORMALIZE_VISIBLE_DEVICES=1
 CUDA_PREFLIGHT=1
 CUDA_READY_TIMEOUT=90
 CUDA_READY_INTERVAL=10
@@ -123,11 +124,21 @@ RunPodは同じ可変Dockerタグをキャッシュする場合があります�
 
 RunPodではPodが特定の物理ホストへ割り当てられます。問題のログでは5090を`nvidia-smi`は認識している一方、CUDA 12.8版PyTorchの`torch.cuda.is_available()`が`False`で、実テンソル演算も`CUDA unknown error`になっていました。これはVRAM不足やworkflow設定ではなく、その割り当てホストのCUDA初期化失敗です。
 
-起動時に別Pythonプロセスで`nvidia-smi`と実CUDA演算を最大90秒検査します。合格するまでモデルダウンロードは始めません。次が出た場合はPodを**Terminateして新規デプロイ**してください。Stop/Startは同じ物理ホストに紐づいたままになる場合があります。
+起動時、`nvidia-smi`がGPUを1台だけ返す場合はTorchをimportする前に`CUDA_VISIBLE_DEVICES=0`へ正規化します。続いて、固定済みのTorch 2.10.0 / TorchVision 0.25.0 / TorchAudio 2.10.0 cu128が混在していないことと、別Pythonプロセスでの実CUDA演算を検査します。ベースイメージはDocker Hubタグだけでなくlinux/amd64 manifest digestまで固定しています。
+
+CUDA初期化は最大90秒待ちますが、RTX 5090/BlackwellでNVIDIA driverが570.26未満なら再試行しても動かないため即停止します。合格するまでモデルダウンロードは始めません。次が出た場合はPodを**Terminateして新規デプロイ**してください。Stop/Startは同じ物理ホストに紐づいたままになる場合があります。
 
 ```text
 [gpu-preflight] FATAL: this Pod's assigned GPU cannot execute CUDA.
 No model download was started.
+```
+
+正常時はダウンロードより前に次の3種類が出ます。
+
+```text
+[cuda-bootstrap] Using CUDA_VISIBLE_DEVICES=0 for the single GPU exposed by RunPod (...)
+[gpu-preflight] TORCH STACK READY {"torch": "2.10.0+cu128", ...}
+[gpu-preflight] READY attempt=1
 ```
 
 `CUDA out of memory`は別問題です。その場合は832×480・81 framesから始め、RIFEと2倍upscaleを切って確認してください。

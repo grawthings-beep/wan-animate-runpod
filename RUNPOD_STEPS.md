@@ -58,6 +58,7 @@ HF_XET_HIGH_PERFORMANCE=1
 HF_XET_NUM_CONCURRENT_RANGE_GETS=64
 HF_XET_CHUNK_CACHE_SIZE_BYTES=0
 HF_HUB_DOWNLOAD_TIMEOUT=300
+CUDA_NORMALIZE_VISIBLE_DEVICES=1
 CUDA_PREFLIGHT=1
 CUDA_READY_TIMEOUT=90
 CUDA_READY_INTERVAL=10
@@ -83,6 +84,8 @@ RunPod UIではSecretを選ぶと表示形式が多少違う場合がありま�
 Logsで次を確認します。
 
 ```text
+[cuda-bootstrap] Using CUDA_VISIBLE_DEVICES=0 for the single GPU exposed by RunPod (...)
+[gpu-preflight] TORCH STACK READY {"torch": "2.10.0+cu128", "torchvision": "0.25.0+cu128", "torchaudio": "2.10.0+cu128", "torch_cuda": "12.8"}
 [gpu-preflight] READY attempt=1
 MODEL PROFILE: loop-quality (11 assets)
 DISK PREFLIGHT: path=/workspace/comfyui free=... download_remaining=40.94 GB headroom=12.00 GB
@@ -97,7 +100,7 @@ TRANSFER ENGINE: 4 files in parallel
 [gpu-preflight] FATAL: this Pod's assigned GPU cannot execute CUDA.
 ```
 
-90秒でこの表示になったら、設定変更やStop/Startを繰り返さず、PodをTerminateして同じTemplateから新規デプロイしてください。新しいPodは別の空き物理ホストへ割り当てられます。`insufficient /workspace capacity before download`ならGPUではなくVolume Disk不足なので、100 GB以上へ増やしてデプロイし直します。
+90秒でこの表示になったら、設定変更やStop/Startを繰り返さず、PodをTerminateして同じTemplateから新規デプロイしてください。RTX 5090/Blackwellでdriver 570.26未満の場合は回復不能なので最初の検査で停止します。新しいPodは別の空き物理ホストへ割り当てられます。`incompatible PyTorch runtime`ならイメージのTorch wheel混在、`insufficient /workspace capacity before download`ならGPUではなくVolume Disk不足です。
 
 更新直後はRunPodの可変タグキャッシュを避けるため、GitHub Actionsが発行した
 `ghcr.io/grawthings-beep/wan-animate-runpod:sha-<40文字のcommit SHA>`を
