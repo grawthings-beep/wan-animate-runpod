@@ -104,7 +104,7 @@ class WorkflowWiringTests(unittest.TestCase):
             for item in node["widgets_values"]
             if isinstance(item, dict) and item.get("lora")
         ]
-        self.assertEqual(len(entries), 6)
+        self.assertEqual(len(entries), 8)
         self.assertEqual(
             {item["lora"] for item in entries},
             {
@@ -113,6 +113,8 @@ class WorkflowWiringTests(unittest.TestCase):
                 "NSFW-22-L-e8.safetensors",
                 "SmoothXXXAnimation_High.safetensors",
                 "SmoothXXXAnimation_Low.safetensors",
+                "Cumshot_Aesthetics_High.safetensors",
+                "Cumshot_Aesthetics_Low.safetensors",
             },
         )
         active = {item["lora"] for item in entries if item["on"] is True}
@@ -145,6 +147,17 @@ class WorkflowWiringTests(unittest.TestCase):
             },
         )
         self.assertTrue(all(item["on"] is True for item in smooth_xxx))
+        cumshot = [
+            item for item in entries if item["lora"].startswith("Cumshot_Aesthetics_")
+        ]
+        self.assertEqual(
+            {item["lora"]: item["strength"] for item in cumshot},
+            {
+                "Cumshot_Aesthetics_High.safetensors": 1.0,
+                "Cumshot_Aesthetics_Low.safetensors": 1.0,
+            },
+        )
+        self.assertTrue(all(item["on"] is False for item in cumshot))
 
     def test_loop_workflow_uses_requested_resolution(self):
         for path in WORKFLOWS[1:]:
@@ -154,6 +167,24 @@ class WorkflowWiringTests(unittest.TestCase):
                 self.assertEqual(node["properties"]["valueX"], 528)
                 self.assertEqual(node["properties"]["valueY"], 704)
                 self.assertEqual(node["widgets_values"], [528, 528, 704, 704, 0, 0])
+
+    def test_batch10_inherits_optional_cumshot_lora_pair(self):
+        expected = {
+            "Cumshot_Aesthetics_High.safetensors": (1.0, False),
+            "Cumshot_Aesthetics_Low.safetensors": (1.0, False),
+        }
+        for path in WORKFLOWS[1:]:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                entries = {
+                    item["lora"]: (item["strength"], item["on"])
+                    for node in graph["nodes"]
+                    if node["type"] == "Power Lora Loader (rgthree)"
+                    for item in node["widgets_values"]
+                    if isinstance(item, dict)
+                    and item.get("lora", "").startswith("Cumshot_Aesthetics_")
+                }
+                self.assertEqual(entries, expected)
 
     def test_loop_workflow_has_no_unused_model_loaders(self):
         for path in WORKFLOWS[1:]:

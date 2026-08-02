@@ -358,6 +358,7 @@ def patch_loop(aio):
             ),
             lora("NSFW-22-H-e8.safetensors", 2.75, True),
             lora("SmoothXXXAnimation_High.safetensors", 1.5, True),
+            lora("Cumshot_Aesthetics_High.safetensors", 1.0),
         ],
     )
     configure_lora_node(
@@ -370,6 +371,7 @@ def patch_loop(aio):
             ),
             lora("NSFW-22-L-e8.safetensors", 1.65, True),
             lora("SmoothXXXAnimation_Low.safetensors", 1.0, True),
+            lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
         ],
     )
 
@@ -388,9 +390,11 @@ def patch_loop(aio):
         "or irreversible actions. Generate 81 frames first; extend only after "
         "the short loop is clean. This preset is deliberately silent so the "
         "audio track cannot introduce a seam.\n\n"
-        "All LoRAs are ON: LightX2V 3.0 High / 1.5 Low, NSFW-22 2.75 High / "
-        "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Default base "
-        "resolution is 528 x 704.\n\n"
+        "Core LoRAs are ON: LightX2V 3.0 High / 1.5 Low, NSFW-22 2.75 High / "
+        "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Anime Cumshot "
+        "Aesthetics High/Low is available at 1.0 but OFF by default because its "
+        "author targets the official WAN base and warns that AIO/merged models "
+        "may be unstable. Default base resolution is 528 x 704.\n\n"
         + existing_note
     )
     combine = by_id[332].get("widgets_values")

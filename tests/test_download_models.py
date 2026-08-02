@@ -194,6 +194,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "lightx-i2v",
                 "loop-nsfw-loras",
                 "loop-xxx-loras",
+                "loop-cumshot-loras",
                 "rife49",
             },
         )
@@ -202,7 +203,7 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 11)
+        self.assertEqual(len(selected), 13)
         self.assertIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
             selected,
@@ -218,6 +219,12 @@ class DownloadModelsTests(unittest.TestCase):
             {
                 "SmoothXXXAnimation_High.safetensors",
                 "SmoothXXXAnimation_Low.safetensors",
+            }.issubset(selected)
+        )
+        self.assertTrue(
+            {
+                "Cumshot_Aesthetics_High.safetensors",
+                "Cumshot_Aesthetics_Low.safetensors",
             }.issubset(selected)
         )
 
@@ -240,6 +247,40 @@ class DownloadModelsTests(unittest.TestCase):
             )
         )
         self.assertTrue(all(entry.get("requires_env") == ["HF_TOKEN"] for entry in entries))
+
+    def test_loop_cumshot_loras_are_verified_hugging_face_downloads(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        entries = [
+            entry
+            for entry in manifest["models"]
+            if entry["group"] == "loop-cumshot-loras"
+        ]
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(
+            {entry["size_bytes"] for entry in entries}, {306807976}
+        )
+        self.assertEqual(
+            {entry["sha256"] for entry in entries},
+            {
+                "a63d6ed7bca18ed83dd60a7f42951f7809ea718bfef52cf6ecec204c619eb218",
+                "73603d65fa727b99b101bfc66cf6c9c5c2610c18394aa4ff1db4f096633aa627",
+            },
+        )
+        self.assertTrue(
+            all(
+                entry["url"].startswith(
+                    "https://huggingface.co/uwgm/nikke-civitai-backup/resolve/main/"
+                )
+                for entry in entries
+            )
+        )
+        self.assertTrue(
+            all(entry.get("requires_env") == ["HF_TOKEN"] for entry in entries)
+        )
 
     def test_loop_workflow_declares_compatible_profile(self):
         import json

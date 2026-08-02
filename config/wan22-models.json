@@ -4,15 +4,15 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
     "loop-quality": {
-      "description": "Lean, silent first/last-frame loop workspace. Includes the connected SmoothMix I2V pair, active LightX2V rank128 accelerator, NSFW-22 and SmoothXXXAnimation High/Low LoRA pairs, CLIP/VAE/text encoder, and RIFE.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49"]
+      "description": "Lean, silent first/last-frame loop workspace. Includes the connected SmoothMix I2V pair, active LightX2V rank128 accelerator, NSFW-22 and SmoothXXXAnimation High/Low pairs, optional Anime Cumshot Aesthetics High/Low pair, CLIP/VAE/text encoder, and RIFE.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "rife49"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -226,6 +226,24 @@
       "path": "models/loras/SmoothXXXAnimation_Low.safetensors",
       "size_bytes": 306807280,
       "sha256": "ad50dfc46c765a6ccc36d40e8a5f77ac2db041f68266593add12ac5f5eac2d76",
+      "requires_env": ["HF_TOKEN"]
+    },
+    {
+      "name": "WAN 2.2 Anime Cumshot Aesthetics High LoRA",
+      "group": "loop-cumshot-loras",
+      "url": "https://huggingface.co/uwgm/nikke-civitai-backup/resolve/main/23High%20noise-Cumshot%20Aesthetics.safetensors",
+      "path": "models/loras/Cumshot_Aesthetics_High.safetensors",
+      "size_bytes": 306807976,
+      "sha256": "a63d6ed7bca18ed83dd60a7f42951f7809ea718bfef52cf6ecec204c619eb218",
+      "requires_env": ["HF_TOKEN"]
+    },
+    {
+      "name": "WAN 2.2 Anime Cumshot Aesthetics Low LoRA",
+      "group": "loop-cumshot-loras",
+      "url": "https://huggingface.co/uwgm/nikke-civitai-backup/resolve/main/56Low%20noise-Cumshot%20Aesthetics.safetensors",
+      "path": "models/loras/Cumshot_Aesthetics_Low.safetensors",
+      "size_bytes": 306807976,
+      "sha256": "73603d65fa727b99b101bfc66cf6c9c5c2610c18394aa4ff1db4f096633aa627",
       "requires_env": ["HF_TOKEN"]
     },
     {

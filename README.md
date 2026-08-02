@@ -70,7 +70,7 @@ COMFYUI_ARGS=--reserve-vram 3
 
 ## 高速ダウンロード
 
-既定の`loop-quality`は11 assets、約40.94 GBです。4本をサイズ順に並列取得します。
+既定の`loop-quality`は13 assets、約41.55 GBです。4本をサイズ順に並列取得します。
 
 - Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
 - Xet chunk cache: 一回限りの新規取得には不利なので`0`。公式既定と同じく余分な最大10 GBを使わない
@@ -80,7 +80,7 @@ COMFYUI_ARGS=--reserve-vram 3
 
 Network Volumeを使わなくても、RunPodのローカルVolume Diskは`/workspace`へマウントされます。同じPodのStop/Startでは保持され、PodのTerminateで削除されます。毎回ダウンロードする方針なら、PodをTerminateして新規デプロイしてください。429や帯域制限が出る環境だけ`DOWNLOAD_WORKERS=2`へ下げてください。
 
-ダウンロード前に、選択profileの未取得容量と12 GBの作業・出力余白を確認します。`loop-quality`では約52.94 GB以上の空きが必要です。テンプレートはVolume Disk 100 GBにしてください。容量不足なら1 byteも取得する前に停止し、`Disk quota exceeded`を防ぎます。
+ダウンロード前に、選択profileの未取得容量と12 GBの作業・出力余白を確認します。`loop-quality`では約53.55 GB以上の空きが必要です。テンプレートはVolume Disk 100 GBにしてください。容量不足なら1 byteも取得する前に停止し、`Disk quota exceeded`を防ぎます。
 
 ## モデルprofile
 
@@ -88,11 +88,11 @@ Network Volumeを使わなくても、RunPodのローカルVolume Diskは`/works
 |---|---:|---:|---|
 | `lightning-longvideo` | 12 | 43.80 GB | 今回のNative Enhanced Lightning。接続済みQ8 High/Low、全候補LoRA、RIFE、upscaler |
 | `i2v-quality` | 8 | 39.12 GB | Smooth v6のI2V |
-| `loop-quality` | 11 | 40.94 GB | Smooth v6の音なしシームレスループ＋NSFW-22＋SmoothXXXAnimation High/Low |
+| `loop-quality` | 13 | 41.55 GB | Smooth v6の音なしシームレスループ＋NSFW-22＋SmoothXXXAnimation＋Anime Cumshot Aesthetics High/Low |
 | `t2v-quality` | 7 | 40.68 GB | Smooth v6のT2V |
-| `full` | 38 | 145.44 GB | 両ワークフローの全asset |
+| `full` | 40 | 146.06 GB | 両ワークフローの全asset |
 
-`loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、LightX2V rank128、NSFW-22 High/Low、SmoothXXXAnimation High/Lowを取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
+`loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、LightX2V rank128、NSFW-22 High/Low、SmoothXXXAnimation High/Low、Anime Cumshot Aesthetics High/Lowを取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
 
 RunPodは同じ可変Dockerタグをキャッシュする場合があります。更新直後のPodで古いworkflowや不足モデルが表示された場合は、既存PodのStop/Startではなく新規Podを作成し、Actionsが発行する`sha-<40文字のcommit SHA>`タグをContainer Imageに指定してください。起動ログの`BUNDLE REVISION`がそのSHAと一致し、`[check_env] ... required_missing=0`になるまでComfyUIは起動しません。
 
@@ -101,8 +101,9 @@ RunPodは同じ可変Dockerタグをキャッシュする場合があります�
 - `LightX2V rank128`: 少ないstep数で生成するためのアクセラレータ。High 3.0 / Low 1.5で既定ON
 - `NSFW-22-H/L-e8`: CubeyAIのWAN 2.2 General NSFW v0.08a。High 2.75 / Low 1.65で既定ON
 - `SmoothXXXAnimation High/Low`: SmoothMix用animation LoRA。High 1.5 / Low 1.0で既定ON
+- `Anime Cumshot Aesthetics High/Low`: 作者推奨のHigh 1.0 / Low 1.0で追加。公式WANベース向けのため既定OFF
 
-指定どおりLightX2V High 3.0 / Low 1.5、NSFW-22 High 2.75 / Low 1.65、SmoothXXXAnimation High 1.5 / Low 1.0を同時にONにし、既定解像度を528×704に固定しています。4本はprivate Hugging Face backupから取得するため`HF_TOKEN`が必要です。
+指定どおりLightX2V High 3.0 / Low 1.5、NSFW-22 High 2.75 / Low 1.65、SmoothXXXAnimation High 1.5 / Low 1.0を同時にONにし、既定解像度を528×704に固定しています。Anime Cumshot AestheticsはSmoothMixとの組み合わせをユーザーが明示的に試す場合だけHigh/LowをONにしてください。6本はprivate Hugging Face backupから取得するため`HF_TOKEN`が必要です。
 
 ## ワークフロー
 
