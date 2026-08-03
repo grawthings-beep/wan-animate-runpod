@@ -196,6 +196,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "loop-xxx-loras",
                 "loop-cumshot-loras",
                 "loop-iroiro-high-loras",
+                "loop-iroiro-low-loras",
                 "rife49",
             },
         )
@@ -204,7 +205,7 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 18)
+        self.assertEqual(len(selected), 23)
         self.assertIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
             selected,
@@ -235,6 +236,15 @@ class DownloadModelsTests(unittest.TestCase):
                 "head_back_high_wan-2-2_i2v_A14B.safetensors",
                 "paizuri_unaligned_breasts_high_wan-2-2_i2v_A14B.safetensors",
                 "washizukami_high_wan-2-2_i2v_A14B.safetensors",
+            }.issubset(selected)
+        )
+        self.assertTrue(
+            {
+                "cheek_bulge_fellatio_wanvideo_i2v.safetensors",
+                "glans_licking_wanvideo_i2v_epoch5.safetensors",
+                "head_back_wanvideo_i2v_epoch5.safetensors",
+                "paizuri_unaligned_breasts_wanvideo_i2v_epoch5.safetensors",
+                "washizukami_wanvideo_i2v.safetensors",
             }.issubset(selected)
         )
 
@@ -318,6 +328,40 @@ class DownloadModelsTests(unittest.TestCase):
         pinned_prefix = (
             "https://huggingface.co/nashikone/iroiroLoRA/resolve/"
             "bb185a26e882aefc5e7473bbef9340ad3ab1b1da/"
+        )
+        self.assertTrue(all(entry["url"].startswith(pinned_prefix) for entry in entries))
+        self.assertTrue(all("requires_env" not in entry for entry in entries))
+
+    def test_loop_iroiro_low_loras_are_verified_revision_pinned_downloads(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        entries = [
+            entry
+            for entry in manifest["models"]
+            if entry["group"] == "loop-iroiro-low-loras"
+        ]
+        self.assertEqual(len(entries), 5)
+        self.assertEqual(
+            {entry["size_bytes"] for entry in entries},
+            {359258496, 359258504, 359258528, 359258552},
+        )
+        self.assertEqual(
+            {entry["sha256"] for entry in entries},
+            {
+                "9c94c2abe3fdd8c7ef7b23907c4c1c11f607d11065237b7ceb5fd41f5e887837",
+                "fa7a51365d12d37cd195a01e560f3629a3aa91a61dc54f0b4534f8c490ff8de2",
+                "aca07c8f4e2937daf73b7ad17f8ad7c913cef30a78e7113fdb34e7c73b527621",
+                "4f44476da0017942fa431906559bba959e63640ea61859758bb8ebe4f338b632",
+                "ae5e93695ca512b27c387fcfd9b79fce6c15b008b961bca6f60071aec35bab53",
+            },
+        )
+        pinned_prefix = (
+            "https://huggingface.co/nashikone/iroiroLoRA/resolve/"
+            "bb185a26e882aefc5e7473bbef9340ad3ab1b1da/"
+            "Wan2.1_i2v_720p_14B_fp16/"
         )
         self.assertTrue(all(entry["url"].startswith(pinned_prefix) for entry in entries))
         self.assertTrue(all("requires_env" not in entry for entry in entries))

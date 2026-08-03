@@ -4,15 +4,15 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-iroiro-high-loras", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
     "loop-quality": {
-      "description": "Lean, silent first/last-frame loop workspace. Includes the connected SmoothMix I2V pair, active LightX2V rank128 accelerator, NSFW-22 and SmoothXXXAnimation High/Low pairs, optional Anime Cumshot Aesthetics High/Low pair, five optional iroiroLoRA High-noise effects, CLIP/VAE/text encoder, and RIFE.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-iroiro-high-loras", "rife49"]
+      "description": "Lean, silent first/last-frame loop workspace. Includes the connected SmoothMix I2V pair, active LightX2V rank128 accelerator, NSFW-22 and SmoothXXXAnimation High/Low pairs, optional Anime Cumshot Aesthetics High/Low pair, five optional iroiroLoRA High/Low effect pairs, CLIP/VAE/text encoder, and RIFE.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -285,6 +285,46 @@
       "path": "models/loras/washizukami_high_wan-2-2_i2v_A14B.safetensors",
       "size_bytes": 306807976,
       "sha256": "07587222bdf99b026000490002f30cb39a84bea0c7e9ada774884033774ecee9"
+    },
+    {
+      "name": "iroiroLoRA Cheek Bulge Fellatio Low (WAN 2.1 720p)",
+      "group": "loop-iroiro-low-loras",
+      "url": "https://huggingface.co/nashikone/iroiroLoRA/resolve/bb185a26e882aefc5e7473bbef9340ad3ab1b1da/Wan2.1_i2v_720p_14B_fp16/C/cheek_bulge_fellatio_wanvideo_i2v.safetensors",
+      "path": "models/loras/cheek_bulge_fellatio_wanvideo_i2v.safetensors",
+      "size_bytes": 359258504,
+      "sha256": "9c94c2abe3fdd8c7ef7b23907c4c1c11f607d11065237b7ceb5fd41f5e887837"
+    },
+    {
+      "name": "iroiroLoRA Glans Licking Low (WAN 2.1 720p)",
+      "group": "loop-iroiro-low-loras",
+      "url": "https://huggingface.co/nashikone/iroiroLoRA/resolve/bb185a26e882aefc5e7473bbef9340ad3ab1b1da/Wan2.1_i2v_720p_14B_fp16/G/glans_licking_wanvideo_i2v_epoch5.safetensors",
+      "path": "models/loras/glans_licking_wanvideo_i2v_epoch5.safetensors",
+      "size_bytes": 359258528,
+      "sha256": "fa7a51365d12d37cd195a01e560f3629a3aa91a61dc54f0b4534f8c490ff8de2"
+    },
+    {
+      "name": "iroiroLoRA Head Back Low (WAN 2.1 720p)",
+      "group": "loop-iroiro-low-loras",
+      "url": "https://huggingface.co/nashikone/iroiroLoRA/resolve/bb185a26e882aefc5e7473bbef9340ad3ab1b1da/Wan2.1_i2v_720p_14B_fp16/H/head_back_wanvideo_i2v_epoch5.safetensors",
+      "path": "models/loras/head_back_wanvideo_i2v_epoch5.safetensors",
+      "size_bytes": 359258496,
+      "sha256": "aca07c8f4e2937daf73b7ad17f8ad7c913cef30a78e7113fdb34e7c73b527621"
+    },
+    {
+      "name": "iroiroLoRA Paizuri Unaligned Breasts Low (WAN 2.1 720p)",
+      "group": "loop-iroiro-low-loras",
+      "url": "https://huggingface.co/nashikone/iroiroLoRA/resolve/bb185a26e882aefc5e7473bbef9340ad3ab1b1da/Wan2.1_i2v_720p_14B_fp16/P/paizuri_unaligned_breasts_wanvideo_i2v_epoch5.safetensors",
+      "path": "models/loras/paizuri_unaligned_breasts_wanvideo_i2v_epoch5.safetensors",
+      "size_bytes": 359258528,
+      "sha256": "4f44476da0017942fa431906559bba959e63640ea61859758bb8ebe4f338b632"
+    },
+    {
+      "name": "iroiroLoRA Washizukami Low (WAN 2.1 720p)",
+      "group": "loop-iroiro-low-loras",
+      "url": "https://huggingface.co/nashikone/iroiroLoRA/resolve/bb185a26e882aefc5e7473bbef9340ad3ab1b1da/Wan2.1_i2v_720p_14B_fp16/W/washizukami_wanvideo_i2v.safetensors",
+      "path": "models/loras/washizukami_wanvideo_i2v.safetensors",
+      "size_bytes": 359258552,
+      "sha256": "ae5e93695ca512b27c387fcfd9b79fce6c15b008b961bca6f60071aec35bab53"
     },
     {
       "name": "MMAudio large 44k v2 FP16",
