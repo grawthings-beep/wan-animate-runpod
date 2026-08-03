@@ -16,22 +16,77 @@ PYTHON_BIN="$(find_python_bin)" || {
 CUSTOM_NODES_DIR="${COMFYUI_DIR}/custom_nodes"
 mkdir -p "${CUSTOM_NODES_DIR}"
 
+GIT_FETCH_ATTEMPTS="${GIT_FETCH_ATTEMPTS:-5}"
+GIT_RETRY_DELAY_SECONDS="${GIT_RETRY_DELAY_SECONDS:-3}"
+
+if [[ ! "${GIT_FETCH_ATTEMPTS}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: GIT_FETCH_ATTEMPTS must be a positive integer." >&2
+  exit 2
+fi
+if [[ ! "${GIT_RETRY_DELAY_SECONDS}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: GIT_RETRY_DELAY_SECONDS must be a non-negative integer." >&2
+  exit 2
+fi
+
+fetch_pinned_node() {
+  local name="$1"
+  local url="$2"
+  local ref="$3"
+  local target="$4"
+  local attempt status delay
+
+  # Fetch only the pinned commit instead of cloning every remote ref. A clean
+  # repository per attempt also prevents a failed HTTP transfer from poisoning
+  # the next retry. HTTP/1.1 avoids intermittent HTTP/2 proxy failures seen on
+  # GitHub-hosted Docker builders.
+  for ((attempt = 1; attempt <= GIT_FETCH_ATTEMPTS; attempt++)); do
+    rm -rf -- "${target}"
+    mkdir -p "${target}"
+    git -C "${target}" init --quiet
+    git -C "${target}" remote add origin "${url}"
+
+    if git -c http.version=HTTP/1.1 -C "${target}" fetch --depth 1 origin "${ref}"; then
+      git -C "${target}" checkout --force --detach FETCH_HEAD
+      return 0
+    else
+      status=$?
+    fi
+
+    if ((attempt == GIT_FETCH_ATTEMPTS)); then
+      echo "ERROR: failed to fetch custom node ${name} after ${attempt} attempts." >&2
+      return "${status}"
+    fi
+
+    delay=$((GIT_RETRY_DELAY_SECONDS * attempt))
+    echo "WARNING: fetch failed for ${name} (attempt ${attempt}/${GIT_FETCH_ATTEMPTS}); retrying in ${delay}s." >&2
+    sleep "${delay}"
+  done
+}
+
 while IFS='|' read -r name url ref; do
   [[ -z "${name}" || "${name}" =~ ^# ]] && continue
+  if [[ ! "${name}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "ERROR: unsafe custom node directory name: ${name}" >&2
+    exit 2
+  fi
+  if [[ -z "${ref:-}" || ! "${ref}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "ERROR: custom node ${name} must use a pinned 40-character commit." >&2
+    exit 2
+  fi
   target="${CUSTOM_NODES_DIR}/${name}"
 
   if [[ ! -d "${target}/.git" ]]; then
     echo "Installing custom node ${name}"
-    git clone --filter=blob:none --no-checkout "${url}" "${target}"
+    fetch_pinned_node "${name}" "${url}" "${ref}" "${target}"
   else
     echo "Custom node ${name} already exists"
-  fi
-
-  if [[ -n "${ref:-}" ]]; then
-    git -C "${target}" fetch --depth 1 origin "${ref}"
-    git -C "${target}" checkout --detach FETCH_HEAD
-  elif [[ ! -e "${target}/HEAD" ]]; then
-    git -C "${target}" checkout --detach origin/HEAD
+    # The image build starts clean, but keep repeated local invocations
+    # deterministic as well.
+    if ! git -C "${target}" cat-file -e "${ref}^{commit}" 2>/dev/null; then
+      fetch_pinned_node "${name}" "${url}" "${ref}" "${target}"
+    else
+      git -C "${target}" checkout --force --detach "${ref}"
+    fi
   fi
 
   if [[ -f "${target}/requirements.txt" ]]; then

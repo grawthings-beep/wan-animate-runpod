@@ -40,6 +40,26 @@ class ContainerContractTests(unittest.TestCase):
         self.assertTrue((package / "__init__.py").is_file())
         self.assertTrue((package / "web" / "wan_loop_batch.js").is_file())
 
+    def test_custom_nodes_use_retryable_commit_pinned_fetches(self):
+        installer = (ROOT / "scripts" / "install_custom_nodes.sh").read_text(
+            encoding="utf-8"
+        )
+        manifest = (ROOT / "custom_nodes.txt").read_text(encoding="utf-8")
+        entries = [
+            line.split("|")
+            for line in manifest.splitlines()
+            if line and not line.startswith("#")
+        ]
+
+        self.assertIn('GIT_FETCH_ATTEMPTS="${GIT_FETCH_ATTEMPTS:-5}"', installer)
+        self.assertIn("fetch_pinned_node", installer)
+        self.assertIn("http.version=HTTP/1.1", installer)
+        self.assertIn("fetch --depth 1 origin", installer)
+        self.assertNotIn("git clone", installer)
+        self.assertTrue(entries)
+        self.assertTrue(all(len(entry) == 3 for entry in entries))
+        self.assertTrue(all(re.fullmatch(r"[0-9a-f]{40}", entry[2]) for entry in entries))
+
 
 if __name__ == "__main__":
     unittest.main()
