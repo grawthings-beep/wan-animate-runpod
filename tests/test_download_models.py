@@ -195,6 +195,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "loop-nsfw-loras",
                 "loop-xxx-loras",
                 "loop-cumshot-loras",
+                "loop-iroiro-high-loras",
                 "rife49",
             },
         )
@@ -203,7 +204,7 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 13)
+        self.assertEqual(len(selected), 18)
         self.assertIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
             selected,
@@ -225,6 +226,15 @@ class DownloadModelsTests(unittest.TestCase):
             {
                 "Cumshot_Aesthetics_High.safetensors",
                 "Cumshot_Aesthetics_Low.safetensors",
+            }.issubset(selected)
+        )
+        self.assertTrue(
+            {
+                "cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors",
+                "glans_licking_high_wan-2-2_i2v_A14B.safetensors",
+                "head_back_high_wan-2-2_i2v_A14B.safetensors",
+                "paizuri_unaligned_breasts_high_wan-2-2_i2v_A14B.safetensors",
+                "washizukami_high_wan-2-2_i2v_A14B.safetensors",
             }.issubset(selected)
         )
 
@@ -281,6 +291,36 @@ class DownloadModelsTests(unittest.TestCase):
         self.assertTrue(
             all(entry.get("requires_env") == ["HF_TOKEN"] for entry in entries)
         )
+
+    def test_loop_iroiro_loras_are_public_revision_pinned_downloads(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        entries = [
+            entry
+            for entry in manifest["models"]
+            if entry["group"] == "loop-iroiro-high-loras"
+        ]
+        self.assertEqual(len(entries), 5)
+        self.assertEqual({entry["size_bytes"] for entry in entries}, {306807976})
+        self.assertEqual(
+            {entry["sha256"] for entry in entries},
+            {
+                "8e224b68e3eff0a037a925772df0db26ac3483f30247b0992ebbb61213b2fa78",
+                "89fd30a5c977c01a8f3e6f531d1fcb36842ef12088e4aaeb7b45f46cfcd3db4d",
+                "a6a4f0a470d84ae328abcb430204d068e0d3a2420e83960fe2f6f0992f422b58",
+                "5183a314ba80d490227805299fdc671b9fdabf3f030fd2388c405fae8693189b",
+                "07587222bdf99b026000490002f30cb39a84bea0c7e9ada774884033774ecee9",
+            },
+        )
+        pinned_prefix = (
+            "https://huggingface.co/nashikone/iroiroLoRA/resolve/"
+            "bb185a26e882aefc5e7473bbef9340ad3ab1b1da/"
+        )
+        self.assertTrue(all(entry["url"].startswith(pinned_prefix) for entry in entries))
+        self.assertTrue(all("requires_env" not in entry for entry in entries))
 
     def test_loop_workflow_declares_compatible_profile(self):
         import json

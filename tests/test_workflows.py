@@ -104,7 +104,7 @@ class WorkflowWiringTests(unittest.TestCase):
             for item in node["widgets_values"]
             if isinstance(item, dict) and item.get("lora")
         ]
-        self.assertEqual(len(entries), 8)
+        self.assertEqual(len(entries), 13)
         self.assertEqual(
             {item["lora"] for item in entries},
             {
@@ -115,6 +115,11 @@ class WorkflowWiringTests(unittest.TestCase):
                 "SmoothXXXAnimation_Low.safetensors",
                 "Cumshot_Aesthetics_High.safetensors",
                 "Cumshot_Aesthetics_Low.safetensors",
+                "cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors",
+                "glans_licking_high_wan-2-2_i2v_A14B.safetensors",
+                "head_back_high_wan-2-2_i2v_A14B.safetensors",
+                "paizuri_unaligned_breasts_high_wan-2-2_i2v_A14B.safetensors",
+                "washizukami_high_wan-2-2_i2v_A14B.safetensors",
             },
         )
         active = {item["lora"] for item in entries if item["on"] is True}
@@ -158,6 +163,14 @@ class WorkflowWiringTests(unittest.TestCase):
             },
         )
         self.assertTrue(all(item["on"] is False for item in cumshot))
+        iroiro = [
+            item
+            for item in entries
+            if item["lora"].endswith("_high_wan-2-2_i2v_A14B.safetensors")
+        ]
+        self.assertEqual(len(iroiro), 5)
+        self.assertTrue(all(item["strength"] == 1.0 for item in iroiro))
+        self.assertTrue(all(item["on"] is False for item in iroiro))
 
     def test_loop_workflow_uses_requested_resolution(self):
         for path in WORKFLOWS[1:]:
@@ -185,6 +198,36 @@ class WorkflowWiringTests(unittest.TestCase):
                     and item.get("lora", "").startswith("Cumshot_Aesthetics_")
                 }
                 self.assertEqual(entries, expected)
+
+    def test_batch10_inherits_optional_iroiro_high_loras(self):
+        expected = {
+            "cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors": (1.0, False),
+            "glans_licking_high_wan-2-2_i2v_A14B.safetensors": (1.0, False),
+            "head_back_high_wan-2-2_i2v_A14B.safetensors": (1.0, False),
+            "paizuri_unaligned_breasts_high_wan-2-2_i2v_A14B.safetensors": (1.0, False),
+            "washizukami_high_wan-2-2_i2v_A14B.safetensors": (1.0, False),
+        }
+        for path in WORKFLOWS[1:]:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                high_loader = next(node for node in graph["nodes"] if node["id"] == 325)
+                low_loader = next(node for node in graph["nodes"] if node["id"] == 324)
+                entries = {
+                    item["lora"]: (item["strength"], item["on"])
+                    for item in high_loader["widgets_values"]
+                    if isinstance(item, dict)
+                    and item.get("lora", "").endswith(
+                        "_high_wan-2-2_i2v_A14B.safetensors"
+                    )
+                }
+                self.assertEqual(entries, expected)
+                self.assertFalse(
+                    any(
+                        isinstance(item, dict)
+                        and item.get("lora") in expected
+                        for item in low_loader["widgets_values"]
+                    )
+                )
 
     def test_loop_workflow_has_no_unused_model_loaders(self):
         for path in WORKFLOWS[1:]:

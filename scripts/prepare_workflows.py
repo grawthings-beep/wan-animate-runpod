@@ -359,6 +359,20 @@ def patch_loop(aio):
             lora("NSFW-22-H-e8.safetensors", 2.75, True),
             lora("SmoothXXXAnimation_High.safetensors", 1.5, True),
             lora("Cumshot_Aesthetics_High.safetensors", 1.0),
+            lora(
+                "cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors",
+                1.0,
+            ),
+            lora(
+                "glans_licking_high_wan-2-2_i2v_A14B.safetensors",
+                1.0,
+            ),
+            lora("head_back_high_wan-2-2_i2v_A14B.safetensors", 1.0),
+            lora(
+                "paizuri_unaligned_breasts_high_wan-2-2_i2v_A14B.safetensors",
+                1.0,
+            ),
+            lora("washizukami_high_wan-2-2_i2v_A14B.safetensors", 1.0),
         ],
     )
     configure_lora_node(
@@ -374,6 +388,14 @@ def patch_loop(aio):
             lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
         ],
     )
+
+    # The five new High-only entries make the loader taller. Lift both loader
+    # nodes into their group so the High loader does not cover the prompt box.
+    by_id[325]["pos"][1] = 2365
+    by_id[324]["pos"][1] = 2365
+    lora_group = next(group for group in graph["groups"] if group["id"] == 45)
+    lora_group["bounding"][1] = 2325
+    lora_group["bounding"][3] = 700
 
     resolution = by_id[328]
     resolution["properties"]["valueX"] = 528
@@ -394,7 +416,9 @@ def patch_loop(aio):
         "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Anime Cumshot "
         "Aesthetics High/Low is available at 1.0 but OFF by default because its "
         "author targets the official WAN base and warns that AIO/merged models "
-        "may be unstable. Default base resolution is 528 x 704.\n\n"
+        "may be unstable. Five iroiroLoRA High-noise effects are also available "
+        "at 1.0 and OFF by default; enable only the intended effect. Default base "
+        "resolution is 528 x 704.\n\n"
         + existing_note
     )
     combine = by_id[332].get("widgets_values")
