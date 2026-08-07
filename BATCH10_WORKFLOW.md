@@ -4,6 +4,8 @@
 
 `wan22_smooth_v6_seamless_loop_batch10_runpod.json`
 
+完成動画へ自動モザイクを入れる場合は、同じ操作で`wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod.json`を使います。各ジョブのRIFE後・MP4保存前にCPU処理し、最後のZIPにはモザイク済み10本だけが入ります。
+
 ## 使い方
 
 1. `01`〜`10` の各スロットで画像を1枚選び、その画像に対応するpositive promptを入力します。

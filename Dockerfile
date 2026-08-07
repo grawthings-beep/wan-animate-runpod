@@ -33,6 +33,14 @@ COPY scripts/ /opt/runpod-wan-animate/scripts/
 COPY workflows/ /opt/runpod-wan-animate/workflows/
 COPY custom_nodes/ /opt/comfyui-baked/custom_nodes/
 
+# The explicit-region detector runs on CPU so it never competes with WAN/RIFE
+# for VRAM. The global constraint file prevents this package from replacing the
+# pinned CUDA 12.8 torch family while installing its normal CPU-side helpers.
+RUN "$(command -v python || command -v python3)" -m pip install --no-cache-dir \
+        -r /opt/comfyui-baked/custom_nodes/ComfyUI-WanLoopBatch/requirements.txt \
+    && "$(command -v python || command -v python3)" -c \
+        "import ultralytics; assert ultralytics.__version__ == '8.4.104'"
+
 # Keep the transfer stack isolated from ComfyUI's Python dependencies.  The
 # current Hugging Face client automatically uses the Rust hf_xet backend.
 RUN set -eu; \

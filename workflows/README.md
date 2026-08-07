@@ -4,6 +4,8 @@
 - `wan22_smooth_v6_aio_runpod.json`: Smooth v6のI2V / T2V / First-to-Last Frame / Audio2Video
 - `wan22_smooth_v6_seamless_loop_runpod.json`: Smooth v6の音なしシームレスループ専用preset。別ブランチ、未接続GGUF、任意LoRA、MMAudioを除去
 - `wan22_smooth_v6_seamless_loop_batch10_runpod.json`: 10画像・10promptを独立した10ジョブとして逐次実行し、完了後に10本入りZIPを自動ダウンロード
+- `wan22_smooth_v6_seamless_loop_auto_mosaic_runpod.json`: 通常ループのRIFE後・MP4化前にCPU自動モザイクを適用する別preset
+- `wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod.json`: 10本逐次版の各完成動画へCPU自動モザイクを適用し、モザイク済み10本をZIP化
 - `source/*.json`: ユーザー提供の未加工source
 
 生成物は`scripts/prepare_workflows.py`で決定的に作ります。配布モデル名への正規化、古い絶対パスとvideo preview metadataの削除、任意LoRA表示、RunPod profile metadataの追加を行います。

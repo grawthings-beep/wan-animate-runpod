@@ -40,6 +40,15 @@ class ContainerContractTests(unittest.TestCase):
         self.assertTrue((package / "__init__.py").is_file())
         self.assertTrue((package / "web" / "wan_loop_batch.js").is_file())
 
+    def test_auto_mosaic_runtime_is_pinned_and_cpu_node_is_bundled(self):
+        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+        package = ROOT / "custom_nodes" / "ComfyUI-WanLoopBatch"
+        requirements = (package / "requirements.txt").read_text(encoding="utf-8")
+
+        self.assertTrue((package / "mosaic_nodes.py").is_file())
+        self.assertEqual(requirements.strip(), "ultralytics==8.4.104")
+        self.assertIn("ComfyUI-WanLoopBatch/requirements.txt", dockerfile)
+
     def test_custom_nodes_use_retryable_commit_pinned_fetches(self):
         installer = (ROOT / "scripts" / "install_custom_nodes.sh").read_text(
             encoding="utf-8"

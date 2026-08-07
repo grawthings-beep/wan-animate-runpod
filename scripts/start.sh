@@ -32,6 +32,7 @@ MODEL_MANIFEST="${MODEL_MANIFEST:-${CONFIG_DIR}/wan22-models.json}"
 MODEL_PROFILE="${MODEL_PROFILE:-loop-quality}"
 PORT="${PORT:-8188}"
 LISTEN="${LISTEN:-0.0.0.0}"
+export MODEL_ROOT
 
 echo "BUNDLE REVISION: ${BUNDLE_REVISION:-unknown}"
 echo "MODEL PROFILE: ${MODEL_PROFILE}"
@@ -51,12 +52,16 @@ export HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-300}"
 export TORCH_HOME="${TORCH_HOME:-/workspace/.cache/torch}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/.cache}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+export YOLO_CONFIG_DIR="${YOLO_CONFIG_DIR:-/workspace/.cache/ultralytics}"
+export YOLO_AUTOINSTALL="${YOLO_AUTOINSTALL:-false}"
+export YOLO_OFFLINE="${YOLO_OFFLINE:-true}"
 
 mkdir -p \
   "${WORKSPACE_DIR}/input" \
   "${WORKSPACE_DIR}/output" \
   "${WORKSPACE_DIR}/user/default/workflows" \
   "${MODEL_ROOT}/models/checkpoints" \
+  "${MODEL_ROOT}/models/auto_mosaic" \
   "${MODEL_ROOT}/models/clip" \
   "${MODEL_ROOT}/models/clip_vision" \
   "${MODEL_ROOT}/models/diffusion_models" \
@@ -71,7 +76,8 @@ mkdir -p \
   "${CONFIG_DIR}" \
   "${HF_HOME}" \
   "${HF_XET_CACHE}" \
-  "${TORCH_HOME}"
+  "${TORCH_HOME}" \
+  "${YOLO_CONFIG_DIR}"
 
 # A broken RunPod host can expose the GPU through nvidia-smi while every CUDA
 # call fails. Detect that before paying the time and bandwidth for 40+ GB.

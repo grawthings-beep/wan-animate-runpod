@@ -64,6 +64,9 @@ CUDA_READY_TIMEOUT=90
 CUDA_READY_INTERVAL=10
 MODEL_DISK_PREFLIGHT=1
 MODEL_DISK_HEADROOM_GB=12
+YOLO_CONFIG_DIR=/workspace/.cache/ultralytics
+YOLO_AUTOINSTALL=false
+YOLO_OFFLINE=true
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
@@ -87,11 +90,11 @@ Logsで次を確認します。
 [cuda-bootstrap] Using CUDA_VISIBLE_DEVICES=0 for the single GPU exposed by RunPod (...)
 [gpu-preflight] TORCH STACK READY {"torch": "2.10.0+cu128", "torchvision": "0.25.0+cu128", "torchaudio": "2.10.0+cu128", "torch_cuda": "12.8"}
 [gpu-preflight] READY attempt=1
-MODEL PROFILE: loop-quality (23 assets)
-DISK PREFLIGHT: path=/workspace/comfyui free=... download_remaining=44.88 GB headroom=12.00 GB
+MODEL PROFILE: loop-quality (24 assets)
+DISK PREFLIGHT: path=/workspace/comfyui free=... download_remaining=44.90 GB headroom=12.00 GB
 TRANSFER ENGINE: 4 files in parallel
 ...
-[check_env] profile=loop-quality assets=23 required_missing=0 optional_missing=0
+[check_env] profile=loop-quality assets=24 required_missing=0 optional_missing=0
 ```
 
 `nvidia-smi`がGPUを表示していても、PyTorchの実演算が失敗するRunPodホストがあります。その場合はモデル取得前に次で停止します。
@@ -107,11 +110,11 @@ TRANSFER ENGINE: 4 files in parallel
 Container Imageに指定します。既存PodのStop/Startではイメージが更新されないため、
 Podを作り直してください。ログ先頭の`BUNDLE REVISION`が指定SHAと一致することも確認します。
 
-新規Podは約44.88 GBです。途中でPodを停止しても、同じローカルVolume DiskならHF cacheまたは`.part`から再開します。PodをTerminateした場合は削除され、次の新規Podで再取得します。`required_missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
+新規Podは約44.90 GBです。途中でPodを停止しても、同じローカルVolume DiskならHF cacheまたは`.part`から再開します。PodをTerminateした場合は削除され、次の新規Podで再取得します。`required_missing=0`になった後、ConnectからHTTP Service Port 8188を開きます。
 
 ## 5. workflowを開く
 
-Workflowsから`wan22_smooth_v6_seamless_loop_runpod`を開きます。既存Volumeを新しいimageへ更新した場合は、末尾が`-bundle-<hash>`の最新版を開いてください。FIRST FRAMEとLAST FRAMEに同じ画像を設定し、最初は81 framesで生成してください。
+通常版は`wan22_smooth_v6_seamless_loop_runpod`、完成動画に自動モザイクを入れる別版は`wan22_smooth_v6_seamless_loop_auto_mosaic_runpod`を開きます。10本を逐次生成する場合は、それぞれの`batch10`版を使います。既存Volumeを新しいimageへ更新した場合は、末尾が`-bundle-<hash>`の最新版を開いてください。FIRST FRAMEとLAST FRAMEに同じ画像を設定し、最初は81 framesで生成してください。
 
 ## 6. 更新
 

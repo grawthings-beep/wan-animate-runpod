@@ -9,6 +9,12 @@ WORKFLOWS = (
     ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json",
     ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_batch10_runpod.json",
 )
+MOSAIC_WORKFLOWS = (
+    ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_auto_mosaic_runpod.json",
+    ROOT
+    / "workflows"
+    / "wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod.json",
+)
 LIGHTNING = (
     ROOT / "workflows" / "wan22_native_enhanced_lightning_longvideo_runpod.json"
 )
@@ -67,7 +73,7 @@ class WorkflowWiringTests(unittest.TestCase):
                     self.assertEqual(negative[1:3], nag_negative[1:3])
 
     def test_every_top_level_link_matches_its_declared_slots(self):
-        for path in (*WORKFLOWS, LIGHTNING):
+        for path in (*WORKFLOWS, *MOSAIC_WORKFLOWS, LIGHTNING):
             with self.subTest(path=path.name):
                 graph = self.load(path)
                 links = {link[0]: link for link in graph["links"]}
@@ -325,6 +331,65 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertEqual(by_id[filenames_link[1]]["type"], "VHS_VideoCombine")
         self.assertEqual(filenames_link[2], 0)
         self.assertEqual(context_link[1:3], [selector["id"], 3])
+
+    def test_auto_mosaic_is_a_separate_post_rife_pre_encode_workflow(self):
+        for path in WORKFLOWS:
+            graph = self.load(path)
+            self.assertNotIn(
+                "WanAutoMosaicVideo", {node["type"] for node in graph["nodes"]}
+            )
+
+        for path in MOSAIC_WORKFLOWS:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                by_id = {node["id"]: node for node in graph["nodes"]}
+                links = {link[0]: link for link in graph["links"]}
+                mosaics = [
+                    node
+                    for node in graph["nodes"]
+                    if node["type"] == "WanAutoMosaicVideo"
+                ]
+                self.assertEqual(len(mosaics), 1)
+                mosaic = mosaics[0]
+                input_link = links[mosaic["inputs"][0]["link"]]
+                self.assertEqual(by_id[input_link[1]]["type"], "RIFE VFI")
+
+                combine = next(
+                    node
+                    for node in graph["nodes"]
+                    if node["type"] == "VHS_VideoCombine"
+                )
+                image_input = next(
+                    item for item in combine["inputs"] if item["name"] == "images"
+                )
+                output_link = links[image_input["link"]]
+                self.assertEqual(output_link[1:3], [mosaic["id"], 0])
+                self.assertEqual(
+                    mosaic["widgets_values"],
+                    [
+                        "erax-anti-nsfw-yolo11s-v1.1.pt",
+                        0.2,
+                        0.35,
+                        18.0,
+                        28,
+                        2,
+                        "anus,nipple,penis,vagina",
+                        False,
+                    ],
+                )
+                self.assertEqual(
+                    graph["extra"]["runpod_bundle"]["profile"], "loop-quality"
+                )
+
+    def test_batch10_mosaic_still_finalizes_the_encoded_files(self):
+        graph = self.load(MOSAIC_WORKFLOWS[1])
+        by_id = {node["id"]: node for node in graph["nodes"]}
+        links = {link[0]: link for link in graph["links"]}
+        finalizer = next(
+            node for node in graph["nodes"] if node["type"] == "WanLoopBatchFinalize"
+        )
+        filenames = links[finalizer["inputs"][0]["link"]]
+        self.assertEqual(by_id[filenames[1]]["type"], "VHS_VideoCombine")
 
     def test_lightning_models_are_normalized_to_manifest_names(self):
         graph = self.load(LIGHTNING)

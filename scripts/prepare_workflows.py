@@ -26,6 +26,16 @@ OUTPUTS = {
         / "workflows"
         / "wan22_smooth_v6_seamless_loop_batch10_runpod.json"
     ),
+    "loop_mosaic": (
+        ROOT
+        / "workflows"
+        / "wan22_smooth_v6_seamless_loop_auto_mosaic_runpod.json"
+    ),
+    "batch10_mosaic": (
+        ROOT
+        / "workflows"
+        / "wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod.json"
+    ),
     "lightning": (
         ROOT
         / "workflows"
@@ -683,6 +693,191 @@ def patch_loop_batch10(loop):
     return graph
 
 
+def _auto_mosaic_node(node_id, position, order):
+    return {
+        "id": node_id,
+        "type": "WanAutoMosaicVideo",
+        "pos": list(position),
+        "size": [410, 360],
+        "flags": {},
+        "order": order,
+        "mode": 0,
+        "inputs": [
+            {"name": "images", "type": "IMAGE", "link": None},
+            {
+                "name": "model_name",
+                "type": "COMBO",
+                "widget": {"name": "model_name"},
+                "link": None,
+            },
+            {
+                "name": "confidence",
+                "type": "FLOAT",
+                "widget": {"name": "confidence"},
+                "link": None,
+            },
+            {
+                "name": "iou_threshold",
+                "type": "FLOAT",
+                "widget": {"name": "iou_threshold"},
+                "link": None,
+            },
+            {
+                "name": "expand_percent",
+                "type": "FLOAT",
+                "widget": {"name": "expand_percent"},
+                "link": None,
+            },
+            {
+                "name": "block_size",
+                "type": "INT",
+                "widget": {"name": "block_size"},
+                "link": None,
+            },
+            {
+                "name": "temporal_radius",
+                "type": "INT",
+                "widget": {"name": "temporal_radius"},
+                "link": None,
+            },
+            {
+                "name": "target_classes",
+                "type": "STRING",
+                "widget": {"name": "target_classes"},
+                "link": None,
+            },
+            {
+                "name": "include_make_love_context",
+                "type": "BOOLEAN",
+                "widget": {"name": "include_make_love_context"},
+                "link": None,
+            },
+        ],
+        "outputs": [
+            {
+                "name": "mosaicked_images",
+                "type": "IMAGE",
+                "links": [],
+            }
+        ],
+        "properties": {"Node name for S&R": "WanAutoMosaicVideo"},
+        "widgets_values": [
+            "erax-anti-nsfw-yolo11s-v1.1.pt",
+            0.20,
+            0.35,
+            18.0,
+            28,
+            2,
+            "anus,nipple,penis,vagina",
+            False,
+        ],
+        "title": "AUTO MOSAIC COMPLETED FRAMES (CPU)",
+    }
+
+
+def patch_auto_mosaic(loop, batch10=False):
+    """Insert CPU auto-mosaic after RIFE and before the only MP4 encode."""
+    graph = copy.deepcopy(loop)
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    combine = next(
+        node for node in graph["nodes"] if node["type"] == "VHS_VideoCombine"
+    )
+    image_input = next(
+        (index, item)
+        for index, item in enumerate(combine["inputs"])
+        if item["name"] == "images"
+    )
+    combine_slot, combine_images = image_input
+    upstream_link = _top_level_link(graph, combine_images["link"])
+    upstream = by_id[upstream_link[1]]
+    if upstream["type"] != "RIFE VFI":
+        raise ValueError(
+            "auto mosaic must be inserted immediately after RIFE VFI; got "
+            + str(upstream["type"])
+        )
+
+    mosaic_id = graph["last_node_id"] + 1
+    mosaic = _auto_mosaic_node(
+        mosaic_id,
+        (1280, 2900),
+        max(node.get("order", 0) for node in graph["nodes"]) + 1,
+    )
+    graph["nodes"].append(mosaic)
+    graph["last_node_id"] = mosaic_id
+
+    # Reuse the RIFE link as the mosaic input, then add a fresh mosaic->encode
+    # link. This preserves both serialized endpoint link lists.
+    upstream_link[3] = mosaic_id
+    upstream_link[4] = 0
+    mosaic["inputs"][0]["link"] = upstream_link[0]
+    combine_images["link"] = None
+    append_link(graph, mosaic_id, 0, combine["id"], combine_slot, "IMAGE")
+
+    combine["pos"] = [1710, 3015]
+    values = combine.get("widgets_values")
+    if isinstance(values, dict) and not batch10:
+        values["filename_prefix"] = (
+            "Video/loops-mosaic/%date:yyyy-MM-dd%/%date:hhmmss%-loop-mosaic"
+        )
+
+    group_id = max(group["id"] for group in graph.get("groups", [])) + 1
+    graph.setdefault("groups", []).append(
+        {
+            "id": group_id,
+            "title": "POST-RIFE AUTO MOSAIC (CPU / LOOP-SAFE)",
+            "bounding": [1240, 2800, 450, 500],
+            "color": "#7a3f83",
+            "flags": {},
+        }
+    )
+
+    finalizer = next(
+        (
+            node
+            for node in graph["nodes"]
+            if node["type"] == "WanLoopBatchFinalize"
+        ),
+        None,
+    )
+    if finalizer:
+        finalizer["pos"] = [2100, 3020]
+        zip_group = next(
+            (group for group in graph["groups"] if group["title"] == "ZIP DOWNLOAD AFTER ALL 10"),
+            None,
+        )
+        if zip_group:
+            zip_group["bounding"][0] = 2060
+
+    note = by_id.get(323)
+    if note:
+        note["widgets_values"] = (
+            "AUTO MOSAIC OUTPUT PRESET\n\n"
+            "Mosaic is applied to completed frames after RIFE and before MP4 "
+            "encoding. Detection is CPU-only, so it does not consume WAN GPU "
+            "VRAM. Defaults cover anus/nipple/penis/vagina, expand every box "
+            "by 18%, use a fixed 28-pixel grid, and bridge two neighboring "
+            "frames in both directions with circular loop handling. Enable "
+            "make_love context only when individual-part detection misses; it "
+            "can cover a large part of the frame.\n\n"
+            + str(note.get("widgets_values") or "")
+        )
+
+    bundle = graph.setdefault("extra", {}).setdefault("runpod_bundle", {})
+    bundle.update(
+        {
+            "preset": (
+                "seamless-loop-batch10-sequential-auto-mosaic"
+                if batch10
+                else "seamless-loop-auto-mosaic"
+            ),
+            "profile": "loop-quality",
+            "postprocess": "EraX YOLO11 CPU auto mosaic after RIFE",
+            "requires_all_referenced_assets": True,
+        }
+    )
+    return graph
+
+
 def patch_lightning(graph):
     graph = replace_model_names(graph)
 
@@ -796,10 +991,13 @@ def main():
     )
     aio = patch_aio(smooth_source)
     loop = patch_loop(aio)
+    batch10 = patch_loop_batch10(loop)
     generated = {
         "aio": encode(aio),
         "loop": encode(loop),
-        "batch10": encode(patch_loop_batch10(loop)),
+        "batch10": encode(batch10),
+        "loop_mosaic": encode(patch_auto_mosaic(loop)),
+        "batch10_mosaic": encode(patch_auto_mosaic(batch10, batch10=True)),
         "lightning": encode(patch_lightning(lightning_source)),
     }
 

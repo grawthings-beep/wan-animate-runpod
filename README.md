@@ -63,6 +63,9 @@ CUDA_READY_TIMEOUT=90
 CUDA_READY_INTERVAL=10
 MODEL_DISK_PREFLIGHT=1
 MODEL_DISK_HEADROOM_GB=12
+YOLO_CONFIG_DIR=/workspace/.cache/ultralytics
+YOLO_AUTOINSTALL=false
+YOLO_OFFLINE=true
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
@@ -70,7 +73,7 @@ COMFYUI_ARGS=--reserve-vram 3
 
 ## 高速ダウンロード
 
-既定の`loop-quality`は23 assets、約44.88 GBです。4本をサイズ順に並列取得します。
+既定の`loop-quality`は24 assets、約44.90 GBです。4本をサイズ順に並列取得します。追加分は自動モザイク用の約19 MBだけです。
 
 - Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
 - Xet chunk cache: 一回限りの新規取得には不利なので`0`。公式既定と同じく余分な最大10 GBを使わない
@@ -80,7 +83,7 @@ COMFYUI_ARGS=--reserve-vram 3
 
 Network Volumeを使わなくても、RunPodのローカルVolume Diskは`/workspace`へマウントされます。同じPodのStop/Startでは保持され、PodのTerminateで削除されます。毎回ダウンロードする方針なら、PodをTerminateして新規デプロイしてください。429や帯域制限が出る環境だけ`DOWNLOAD_WORKERS=2`へ下げてください。
 
-ダウンロード前に、選択profileの未取得容量と12 GBの作業・出力余白を確認します。`loop-quality`では約56.88 GB以上の空きが必要です。テンプレートはVolume Disk 100 GBにしてください。容量不足なら1 byteも取得する前に停止し、`Disk quota exceeded`を防ぎます。
+ダウンロード前に、選択profileの未取得容量と12 GBの作業・出力余白を確認します。`loop-quality`では約56.90 GB以上の空きが必要です。テンプレートはVolume Disk 100 GBにしてください。容量不足なら1 byteも取得する前に停止し、`Disk quota exceeded`を防ぎます。
 
 ## モデルprofile
 
@@ -88,9 +91,9 @@ Network Volumeを使わなくても、RunPodのローカルVolume Diskは`/works
 |---|---:|---:|---|
 | `lightning-longvideo` | 12 | 43.80 GB | 今回のNative Enhanced Lightning。接続済みQ8 High/Low、全候補LoRA、RIFE、upscaler |
 | `i2v-quality` | 8 | 39.12 GB | Smooth v6のI2V |
-| `loop-quality` | 23 | 44.88 GB | Smooth v6の音なしシームレスループ＋NSFW-22＋SmoothXXXAnimation＋Anime Cumshot Aesthetics＋iroiroLoRA High/Low 5組 |
+| `loop-quality` | 24 | 44.90 GB | Smooth v6の音なしシームレスループ＋各LoRA＋RIFE＋CPU自動モザイク検出器 |
 | `t2v-quality` | 7 | 40.68 GB | Smooth v6のT2V |
-| `full` | 50 | 149.39 GB | 両ワークフローの全asset |
+| `full` | 51 | 149.41 GB | 全workflowの全asset |
 
 `loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、LightX2V rank128、NSFW-22 High/Low、SmoothXXXAnimation High/Low、Anime Cumshot Aesthetics High/Low、iroiroLoRA High/Low 5組を取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
 
@@ -118,6 +121,8 @@ RunPodは同じ可変Dockerタグをキャッシュする場合があります�
 - `wan22_smooth_v6_aio_runpod`
 - `wan22_smooth_v6_seamless_loop_runpod`
 - `wan22_smooth_v6_seamless_loop_batch10_runpod`
+- `wan22_smooth_v6_seamless_loop_auto_mosaic_runpod`
+- `wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod`
 
 ループ版の流れ:
 
@@ -125,6 +130,18 @@ RunPodは同じ可変Dockerタグをキャッシュする場合があります�
 2. FIRST FRAMEとLAST FRAMEへ同じ画像を入れる。
 3. まず81 framesで、往復ではなく一周する連続動作をpromptへ書く。
 4. 短いループの継ぎ目を確認してから長さやRIFE補間を増やす。
+
+## 完成動画への自動モザイク
+
+既存workflowは変更せず、末尾が`_auto_mosaic_runpod`の2本を別に追加しています。どちらも`RIFE VFI → WAN Auto Mosaic Completed Video (CPU) → VHS Video Combine`の順です。入力画像には処理せず、補間済みの完成フレームへモザイクを入れてから1回だけMP4エンコードします。
+
+- `confidence=0.20`: 見逃しを減らす初期値。誤検出が多ければ0.25〜0.35へ上げる
+- `expand_percent=18`: 検出枠の外側も隠す。漏れがあれば25〜35へ上げる
+- `block_size=28`: 既定のモザイク粒度。強くするなら36〜48
+- `temporal_radius=2`: 前後2フレームとループ境界を循環参照して一瞬の見逃しを埋める
+- `include_make_love_context=false`: ONにすると広い行為領域も対象になるが、画面を大きく隠しやすい
+
+検出はCPU固定なのでWAN/RIFEのVRAMを消費しません。10本版も従来どおり1ジョブずつ生成し、10本目の終了後にモザイク済みMP4をZIPでダウンロードします。自動検出には見逃しの可能性があるため、公開前には必ず完成動画を目視確認してください。検出モデルは[EraX Anti-NSFW V1.1](https://huggingface.co/erax-ai/EraX-Anti-NSFW-V1.1)（Apache-2.0）、推論runtimeは[Ultralytics](https://pypi.org/project/ultralytics/) 8.4.104（AGPL-3.0）へ固定しています。
 
 ## GPU
 

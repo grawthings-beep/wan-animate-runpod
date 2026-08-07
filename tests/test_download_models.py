@@ -198,6 +198,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "loop-iroiro-high-loras",
                 "loop-iroiro-low-loras",
                 "rife49",
+                "auto-mosaic",
             },
         )
         selected = {
@@ -205,7 +206,8 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 23)
+        self.assertEqual(len(selected), 24)
+        self.assertIn("erax-anti-nsfw-yolo11s-v1.1.pt", selected)
         self.assertIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
             selected,
@@ -377,6 +379,28 @@ class DownloadModelsTests(unittest.TestCase):
         self.assertEqual(
             workflow["extra"]["runpod_bundle"]["profile"], "loop-quality"
         )
+
+    def test_auto_mosaic_detector_is_public_revision_pinned_and_verified(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        entries = [
+            entry for entry in manifest["models"] if entry["group"] == "auto-mosaic"
+        ]
+        self.assertEqual(len(entries), 1)
+        entry = entries[0]
+        self.assertEqual(entry["size_bytes"], 19155432)
+        self.assertEqual(
+            entry["sha256"],
+            "6169d17d11b384f09f47502b71f0c772bb93588df098e8d14ad5d6440e038bfc",
+        )
+        self.assertIn(
+            "/resolve/90878ab981060833413ae1a24df72f5e1fff66bc/",
+            entry["url"],
+        )
+        self.assertNotIn("requires_env", entry)
 
     def test_lightning_profile_contains_every_workflow_asset(self):
         import json

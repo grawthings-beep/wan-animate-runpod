@@ -58,6 +58,7 @@ class WanLoopNodeTests(unittest.TestCase):
                     "WanLoopQueueSlot",
                     "WanLoopQueueSelector",
                     "WanLoopBatchFinalize",
+                    "WanAutoMosaicVideo",
                 },
             )
             self.assertEqual(package.WEB_DIRECTORY, "./web")
