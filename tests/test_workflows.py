@@ -367,14 +367,13 @@ class WorkflowWiringTests(unittest.TestCase):
                 self.assertEqual(
                     mosaic["widgets_values"],
                     [
-                        "erax-anti-nsfw-yolo11s-v1.1.pt",
-                        0.2,
-                        0.35,
-                        18.0,
-                        28,
-                        2,
-                        "anus,nipple,penis,vagina",
-                        False,
+                        "ntd11_anime_nsfw_segm_v5.pt",
+                        "JUST",
+                        0.3,
+                        0.5,
+                        0,
+                        3,
+                        "pussy,anus,penis,testicles",
                     ],
                 )
                 self.assertEqual(

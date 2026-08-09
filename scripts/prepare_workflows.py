@@ -711,6 +711,12 @@ def _auto_mosaic_node(node_id, position, order):
                 "link": None,
             },
             {
+                "name": "coverage_preset",
+                "type": "COMBO",
+                "widget": {"name": "coverage_preset"},
+                "link": None,
+            },
+            {
                 "name": "confidence",
                 "type": "FLOAT",
                 "widget": {"name": "confidence"},
@@ -723,33 +729,21 @@ def _auto_mosaic_node(node_id, position, order):
                 "link": None,
             },
             {
-                "name": "expand_percent",
-                "type": "FLOAT",
-                "widget": {"name": "expand_percent"},
-                "link": None,
-            },
-            {
                 "name": "block_size",
                 "type": "INT",
                 "widget": {"name": "block_size"},
                 "link": None,
             },
             {
-                "name": "temporal_radius",
+                "name": "max_gap_frames",
                 "type": "INT",
-                "widget": {"name": "temporal_radius"},
+                "widget": {"name": "max_gap_frames"},
                 "link": None,
             },
             {
                 "name": "target_classes",
                 "type": "STRING",
                 "widget": {"name": "target_classes"},
-                "link": None,
-            },
-            {
-                "name": "include_make_love_context",
-                "type": "BOOLEAN",
-                "widget": {"name": "include_make_love_context"},
                 "link": None,
             },
         ],
@@ -762,16 +756,15 @@ def _auto_mosaic_node(node_id, position, order):
         ],
         "properties": {"Node name for S&R": "WanAutoMosaicVideo"},
         "widgets_values": [
-            "erax-anti-nsfw-yolo11s-v1.1.pt",
-            0.20,
-            0.35,
-            18.0,
-            28,
-            2,
-            "anus,nipple,penis,vagina",
-            False,
+            "ntd11_anime_nsfw_segm_v5.pt",
+            "JUST",
+            0.30,
+            0.50,
+            0,
+            3,
+            "pussy,anus,penis,testicles",
         ],
-        "title": "AUTO MOSAIC COMPLETED FRAMES (CPU)",
+        "title": "AUTO MOSAIC JUST CONTOUR (CPU)",
     }
 
 
@@ -853,12 +846,14 @@ def patch_auto_mosaic(loop, batch10=False):
         note["widgets_values"] = (
             "AUTO MOSAIC OUTPUT PRESET\n\n"
             "Mosaic is applied to completed frames after RIFE and before MP4 "
-            "encoding. Detection is CPU-only, so it does not consume WAN GPU "
-            "VRAM. Defaults cover anus/nipple/penis/vagina, expand every box "
-            "by 18%, use a fixed 28-pixel grid, and bridge two neighboring "
-            "frames in both directions with circular loop handling. Enable "
-            "make_love context only when individual-part detection misses; it "
-            "can cover a large part of the frame.\n\n"
+            "encoding. Anime NSFW Detection v5.0 produces a per-pixel instance "
+            "segmentation mask on CPU, so WAN keeps exclusive GPU VRAM. JUST "
+            "matches the AutoMosaic iPhone contour preset: segmentation only "
+            "with a 4% mask dilation. block_size=0 automatically uses short "
+            "side / 50 (minimum 10 px). max_gap_frames=3 interpolates only "
+            "brief detector misses, including across the loop seam; it never "
+            "unions neighboring masks into frames that already have a valid "
+            "contour. WIDE and SAFE deliberately cover a larger ellipse.\n\n"
             + str(note.get("widgets_values") or "")
         )
 
@@ -871,7 +866,7 @@ def patch_auto_mosaic(loop, batch10=False):
                 else "seamless-loop-auto-mosaic"
             ),
             "profile": "loop-quality",
-            "postprocess": "EraX YOLO11 CPU auto mosaic after RIFE",
+            "postprocess": "Anime NSFW Detection v5 YOLO11-seg JUST contour mosaic after RIFE (CPU)",
             "requires_all_referenced_assets": True,
         }
     )

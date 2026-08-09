@@ -69,11 +69,11 @@ YOLO_OFFLINE=true
 COMFYUI_ARGS=--reserve-vram 3
 ```
 
-`CIVITAI_API_TOKEN`と`HF_TOKEN`は平文入力ではなく、RunPod Secretsの鍵アイコンから割り当てます。既定の`loop-quality`はHugging Faceだけで完結するため、CivitAI tokenなしでも起動できます。HTTP portはNetworking configurationに`8188`を追加し、`PORT`/`LISTEN`は上記の環境変数にも残します。
+`CIVITAI_API_TOKEN`と`HF_TOKEN`は平文入力ではなく、RunPod Secretsの鍵アイコンから割り当てます。既定の`loop-quality`は輪郭モザイク用segmentation modelをCivitAIから取得するため、両方のtokenが必要です。HTTP portはNetworking configurationに`8188`を追加し、`PORT`/`LISTEN`は上記の環境変数にも残します。
 
 ## 高速ダウンロード
 
-既定の`loop-quality`は24 assets、約44.90 GBです。4本をサイズ順に並列取得します。追加分は自動モザイク用の約19 MBだけです。
+既定の`loop-quality`は24 assets、約44.90 GBです。4本をサイズ順に並列取得します。追加分は自動モザイク用の約18.85 MBだけです。
 
 - Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
 - Xet chunk cache: 一回限りの新規取得には不利なので`0`。公式既定と同じく余分な最大10 GBを使わない
@@ -133,15 +133,15 @@ RunPodは同じ可変Dockerタグをキャッシュする場合があります�
 
 ## 完成動画への自動モザイク
 
-既存workflowは変更せず、末尾が`_auto_mosaic_runpod`の2本を別に追加しています。どちらも`RIFE VFI → WAN Auto Mosaic Completed Video (CPU) → VHS Video Combine`の順です。入力画像には処理せず、補間済みの完成フレームへモザイクを入れてから1回だけMP4エンコードします。
+既存workflowは変更せず、末尾が`_auto_mosaic_runpod`の2本を別に追加しています。どちらも`RIFE VFI → WAN Auto Mosaic JUST Segmentation (CPU) → VHS Video Combine`の順です。入力画像には処理せず、補間済みの完成フレームへモザイクを入れてから1回だけMP4エンコードします。
 
-- `confidence=0.20`: 見逃しを減らす初期値。誤検出が多ければ0.25〜0.35へ上げる
-- `expand_percent=18`: 検出枠の外側も隠す。漏れがあれば25〜35へ上げる
-- `block_size=28`: 既定のモザイク粒度。強くするなら36〜48
-- `temporal_radius=2`: 前後2フレームとループ境界を循環参照して一瞬の見逃しを埋める
-- `include_make_love_context=false`: ONにすると広い行為領域も対象になるが、画面を大きく隠しやすい
+- `coverage_preset=JUST`: 検出boxではなく専用YOLO11-segの輪郭maskを使い、境界を4%だけ膨張。iPhone版AutoMosaicのJUSTと同じ設計
+- `confidence=0.30` / `iou_threshold=0.50`: iPhone版と同じ初期値。誤検出が多ければconfidenceを0.40〜0.55へ上げる
+- `block_size=0`: 自動（短辺÷50、最低10 px）。固定したい場合だけ24〜36などを指定
+- `max_gap_frames=3`: 検出に成功したframeはそのframe自身の輪郭だけを使用。一瞬の未検出だけを補間し、ループ境界も循環処理
+- `target_classes=pussy,anus,penis,testicles`: 専用modelの対象。必要な場合だけ`nipples`を追加
 
-検出はCPU固定なのでWAN/RIFEのVRAMを消費しません。10本版も従来どおり1ジョブずつ生成し、10本目の終了後にモザイク済みMP4をZIPでダウンロードします。自動検出には見逃しの可能性があるため、公開前には必ず完成動画を目視確認してください。検出モデルは[EraX Anti-NSFW V1.1](https://huggingface.co/erax-ai/EraX-Anti-NSFW-V1.1)（Apache-2.0）、推論runtimeは[Ultralytics](https://pypi.org/project/ultralytics/) 8.4.104（AGPL-3.0）へ固定しています。
+`WIDE`と`SAFE`は輪郭maskへ大きな楕円を足す安全側presetなので、ジャストに掛けたい場合は`JUST`のまま使います。従来の「矩形を18%拡大して前後frameへunion」は廃止しました。検出はCPU固定なのでWAN/RIFEのVRAMを消費しません。10本版も従来どおり1ジョブずつ生成し、10本目の終了後にモザイク済みMP4をZIPでダウンロードします。自動検出には見逃しの可能性があるため、公開前には必ず完成動画を目視確認してください。検出モデルは[Anime NSFW Detection / ADetailer All-in-One v5.0](https://civitai.com/models/1313556)（YOLO11 segmentation）、推論runtimeは[Ultralytics](https://pypi.org/project/ultralytics/) 8.4.104（AGPL-3.0）へ固定しています。
 
 ## GPU
 

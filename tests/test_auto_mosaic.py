@@ -32,18 +32,22 @@ class AutoMosaicHelperTests(unittest.TestCase):
 
     def test_box_expansion_is_clamped_to_frame(self):
         self.assertEqual(
-            self.module._expanded_box((5, 10, 25, 30), 30, 35, 100),
+            self.module._expanded_box((5, 10, 25, 30), 30, 35, 1.0),
             (0, 0, 30, 35),
         )
 
-    def test_temporal_union_wraps_across_loop_seam(self):
-        masks = np.zeros((4, 2, 2), dtype=np.bool_)
-        masks[0, 0, 0] = True
-        smoothed = self.module._circular_temporal_union(masks, 1)
-        self.assertTrue(smoothed[0, 0, 0])
-        self.assertTrue(smoothed[1, 0, 0])
-        self.assertTrue(smoothed[3, 0, 0])
-        self.assertFalse(smoothed[2, 0, 0])
+    def test_temporal_gap_fill_preserves_detected_contours_and_wraps_seam(self):
+        first = np.zeros((3, 3), dtype=np.bool_)
+        third = np.zeros((3, 3), dtype=np.bool_)
+        first[1, 0] = True
+        third[1, 2] = True
+        filled = self.module._fill_short_circular_gaps(
+            [first, None, third, None], 1
+        )
+        self.assertTrue(np.array_equal(filled[0], first))
+        self.assertTrue(np.array_equal(filled[2], third))
+        self.assertIsNotNone(filled[1])
+        self.assertIsNotNone(filled[3])
 
     def test_fixed_grid_mosaic_uses_stationary_blocks(self):
         image = np.arange(6 * 6 * 3, dtype=np.uint8).reshape(6, 6, 3)
@@ -54,11 +58,22 @@ class AutoMosaicHelperTests(unittest.TestCase):
 
     def test_default_targets_exclude_large_context_class(self):
         ids = self.module._selected_class_ids(
-            {0: "anus", 1: "make_love", 2: "nipple", 3: "penis", 4: "vagina"},
+            {
+                0: "nipples",
+                1: "pussy",
+                2: "anus",
+                3: "penis",
+                4: "cross-section",
+                5: "x-ray",
+                6: "testicles",
+            },
             self.module.DEFAULT_CLASSES,
-            False,
         )
-        self.assertEqual(ids, [0, 2, 3, 4])
+        self.assertEqual(ids, [1, 2, 3, 6])
+
+    def test_auto_block_size_matches_iphone_short_side_rule(self):
+        self.assertEqual(self.module._resolve_block_size(0, 528, 704), 11)
+        self.assertEqual(self.module._resolve_block_size(36, 528, 704), 36)
 
 
 if __name__ == "__main__":

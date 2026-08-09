@@ -11,7 +11,7 @@
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
     "loop-quality": {
-      "description": "Lean, silent first/last-frame loop workspace. Includes the connected SmoothMix I2V pair, active LightX2V rank128 accelerator, NSFW-22 and SmoothXXXAnimation High/Low pairs, optional Anime Cumshot Aesthetics High/Low pair, five optional iroiroLoRA High/Low effect pairs, CLIP/VAE/text encoder, RIFE, and the CPU auto-mosaic detector used by the separate mosaic workflows.",
+      "description": "Lean, silent first/last-frame loop workspace. Includes the connected SmoothMix I2V pair, active LightX2V rank128 accelerator, NSFW-22 and SmoothXXXAnimation High/Low pairs, optional Anime Cumshot Aesthetics High/Low pair, five optional iroiroLoRA High/Low effect pairs, CLIP/VAE/text encoder, RIFE, and the contour segmentation model used by the separate CPU auto-mosaic workflows.",
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
     },
     "t2v-quality": {
@@ -49,12 +49,17 @@
       "sha256": "b3af922346f5a3bc0321c1d8198f89411dfe7af2eae76a346aa21854e1c0e569"
     },
     {
-      "name": "EraX Anti-NSFW YOLO11 Small v1.1 (CPU auto mosaic)",
+      "name": "Anime NSFW Detection v5.0 YOLO11 Segmentation (CPU auto mosaic)",
       "group": "auto-mosaic",
-      "url": "https://huggingface.co/erax-ai/EraX-Anti-NSFW-V1.1/resolve/90878ab981060833413ae1a24df72f5e1fff66bc/erax-anti-nsfw-yolo11s-v1.1.pt",
-      "path": "models/auto_mosaic/erax-anti-nsfw-yolo11s-v1.1.pt",
-      "size_bytes": 19155432,
-      "sha256": "6169d17d11b384f09f47502b71f0c772bb93588df098e8d14ad5d6440e038bfc"
+      "url": "https://civitai.com/api/download/models/2266294",
+      "path": "models/auto_mosaic/animeNSFWDetection_v50.zip",
+      "size_bytes": 18846815,
+      "sha256": "aca92864d30384b8dd7851b32e7ade621a147730bf9710fb4417214e0c61d690",
+      "extract": "pt",
+      "provides": ["models/auto_mosaic/ntd11_anime_nsfw_segm_v5.pt"],
+      "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
+      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
     },
     {
       "name": "SmoothMix WAN 2.2 I2V v2 High",
