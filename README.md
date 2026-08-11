@@ -73,7 +73,7 @@ COMFYUI_ARGS=--reserve-vram 3
 
 ## 高速ダウンロード
 
-既定の`loop-quality`は24 assets、約44.90 GBです。4本をサイズ順に並列取得します。追加分は自動モザイク用の約18.85 MBだけです。
+既定の`loop-quality`は26 assets、約46.13 GBです。4本をサイズ順に並列取得します。自動モザイク用segmentation modelと、任意のJOI Handjob Trend High/Low LoRAも含みます。
 
 - Hugging Face: Rust製`hf_xet`、64 range requests/file、同一Volume上のcacheからhard-linkでzero-copy
 - Xet chunk cache: 一回限りの新規取得には不利なので`0`。公式既定と同じく余分な最大10 GBを使わない
@@ -83,7 +83,7 @@ COMFYUI_ARGS=--reserve-vram 3
 
 Network Volumeを使わなくても、RunPodのローカルVolume Diskは`/workspace`へマウントされます。同じPodのStop/Startでは保持され、PodのTerminateで削除されます。毎回ダウンロードする方針なら、PodをTerminateして新規デプロイしてください。429や帯域制限が出る環境だけ`DOWNLOAD_WORKERS=2`へ下げてください。
 
-ダウンロード前に、選択profileの未取得容量と12 GBの作業・出力余白を確認します。`loop-quality`では約56.90 GB以上の空きが必要です。テンプレートはVolume Disk 100 GBにしてください。容量不足なら1 byteも取得する前に停止し、`Disk quota exceeded`を防ぎます。
+ダウンロード前に、選択profileの未取得容量と12 GBの作業・出力余白を確認します。`loop-quality`では約58.13 GB以上の空きが必要です。テンプレートはVolume Disk 100 GBにしてください。容量不足なら1 byteも取得する前に停止し、`Disk quota exceeded`を防ぎます。
 
 ## モデルprofile
 
@@ -91,11 +91,11 @@ Network Volumeを使わなくても、RunPodのローカルVolume Diskは`/works
 |---|---:|---:|---|
 | `lightning-longvideo` | 12 | 43.80 GB | 今回のNative Enhanced Lightning。接続済みQ8 High/Low、全候補LoRA、RIFE、upscaler |
 | `i2v-quality` | 8 | 39.12 GB | Smooth v6のI2V |
-| `loop-quality` | 24 | 44.90 GB | Smooth v6の音なしシームレスループ＋各LoRA＋RIFE＋CPU自動モザイク検出器 |
+| `loop-quality` | 26 | 46.13 GB | Smooth v6の音なしシームレスループ＋各LoRA＋RIFE＋CPU輪郭モザイク |
 | `t2v-quality` | 7 | 40.68 GB | Smooth v6のT2V |
-| `full` | 51 | 149.41 GB | 全workflowの全asset |
+| `full` | 53 | 150.63 GB | 全workflowの全asset |
 
-`loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、LightX2V rank128、NSFW-22 High/Low、SmoothXXXAnimation High/Low、Anime Cumshot Aesthetics High/Low、iroiroLoRA High/Low 5組を取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
+`loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、LightX2V rank128、NSFW-22 High/Low、SmoothXXXAnimation High/Low、Anime Cumshot Aesthetics High/Low、JOI Handjob Trend High/Low、iroiroLoRA High/Low 5組を取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
 
 RunPodは同じ可変Dockerタグをキャッシュする場合があります。更新直後のPodで古いworkflowや不足モデルが表示された場合は、既存PodのStop/Startではなく新規Podを作成し、Actionsが発行する`sha-<40文字のcommit SHA>`タグをContainer Imageに指定してください。起動ログの`BUNDLE REVISION`がそのSHAと一致し、`[check_env] ... required_missing=0`になるまでComfyUIは起動しません。
 
@@ -105,13 +105,14 @@ RunPodは同じ可変Dockerタグをキャッシュする場合があります�
 - `NSFW-22-H/L-e8`: CubeyAIのWAN 2.2 General NSFW v0.08a。High 2.75 / Low 1.65で既定ON
 - `SmoothXXXAnimation High/Low`: SmoothMix用animation LoRA。High 1.5 / Low 1.0で既定ON
 - `Anime Cumshot Aesthetics High/Low`: 作者推奨のHigh 1.0 / Low 1.0で追加。公式WANベース向けのため既定OFF
+- `JOI Handjob Trend High/Low`: WAN 2.2 I2V-A14B専用。High 1.0 / Low 1.0で既定OFF。使用時は両方をON
 - `cheek_bulge_fellatio`: WAN 2.2 High＋WAN 2.1 Low。triggerは`cheek bulge, fellatio`。各1.0で既定OFF
 - `glans_licking`: WAN 2.2 High＋WAN 2.1 Low。triggerは`glans licking`。各1.0で既定OFF
 - `head_back`: WAN 2.2 High＋WAN 2.1 Low。triggerは`head back`。各1.0で既定OFF
 - `paizuri_unaligned_breasts`: WAN 2.2 High＋WAN 2.1 Low。triggerは`paizuri, unaligned breasts`。各1.0で既定OFF
 - `washizukami`: WAN 2.2 High＋WAN 2.1 Low。作者記載のtriggerは`grabbin own/another's breast, deep skin`。各1.0で既定OFF
 
-指定どおりLightX2V High 3.0 / Low 1.5、NSFW-22 High 2.75 / Low 1.65、SmoothXXXAnimation High 1.5 / Low 1.0を同時にONにし、既定解像度を528×704に固定しています。Anime Cumshot AestheticsはSmoothMixとの組み合わせをユーザーが明示的に試す場合だけHigh/LowをONにしてください。iroiroLoRAは目的に合うHigh/Lowの1組だけを両方ONにするのが基本です。private Hugging Face backupの6本には`HF_TOKEN`が必要ですが、公開iroiroLoRA 10本の取得には不要です。
+指定どおりLightX2V High 3.0 / Low 1.5、NSFW-22 High 2.75 / Low 1.65、SmoothXXXAnimation High 1.5 / Low 1.0を同時にONにし、既定解像度を528×704に固定しています。Anime Cumshot AestheticsはSmoothMixとの組み合わせをユーザーが明示的に試す場合だけHigh/LowをONにしてください。JOI Handjob TrendはHigh/Lowを1.0で両方ONにし、舌を出す動作と手を素早く上下へ反復させる動作をpromptへ明記します。iroiroLoRAは目的に合うHigh/Lowの1組だけを両方ONにするのが基本です。private Hugging Face backupの6本には`HF_TOKEN`、JOI pairと輪郭モザイクmodelには`CIVITAI_API_TOKEN`が必要です。
 
 ## ワークフロー
 

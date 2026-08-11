@@ -110,7 +110,7 @@ class WorkflowWiringTests(unittest.TestCase):
             for item in node["widgets_values"]
             if isinstance(item, dict) and item.get("lora")
         ]
-        self.assertEqual(len(entries), 18)
+        self.assertEqual(len(entries), 20)
         self.assertEqual(
             {item["lora"] for item in entries},
             {
@@ -121,6 +121,8 @@ class WorkflowWiringTests(unittest.TestCase):
                 "SmoothXXXAnimation_Low.safetensors",
                 "Cumshot_Aesthetics_High.safetensors",
                 "Cumshot_Aesthetics_Low.safetensors",
+                "I2V_joi_trend_high.safetensors",
+                "I2V_joi_trend_low.safetensors",
                 "cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors",
                 "glans_licking_high_wan-2-2_i2v_A14B.safetensors",
                 "head_back_high_wan-2-2_i2v_A14B.safetensors",
@@ -174,6 +176,17 @@ class WorkflowWiringTests(unittest.TestCase):
             },
         )
         self.assertTrue(all(item["on"] is False for item in cumshot))
+        joi = [
+            item for item in entries if item["lora"].startswith("I2V_joi_trend_")
+        ]
+        self.assertEqual(
+            {item["lora"]: item["strength"] for item in joi},
+            {
+                "I2V_joi_trend_high.safetensors": 1.0,
+                "I2V_joi_trend_low.safetensors": 1.0,
+            },
+        )
+        self.assertTrue(all(item["on"] is False for item in joi))
         iroiro = [
             item
             for item in entries
@@ -222,6 +235,24 @@ class WorkflowWiringTests(unittest.TestCase):
                     for item in node["widgets_values"]
                     if isinstance(item, dict)
                     and item.get("lora", "").startswith("Cumshot_Aesthetics_")
+                }
+                self.assertEqual(entries, expected)
+
+    def test_all_loop_variants_inherit_optional_joi_lora_pair(self):
+        expected = {
+            "I2V_joi_trend_high.safetensors": (1.0, False),
+            "I2V_joi_trend_low.safetensors": (1.0, False),
+        }
+        for path in WORKFLOWS[1:]:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                entries = {
+                    item["lora"]: (item["strength"], item["on"])
+                    for node in graph["nodes"]
+                    if node["type"] == "Power Lora Loader (rgthree)"
+                    for item in node["widgets_values"]
+                    if isinstance(item, dict)
+                    and item.get("lora", "").startswith("I2V_joi_trend_")
                 }
                 self.assertEqual(entries, expected)
 

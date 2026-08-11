@@ -369,6 +369,7 @@ def patch_loop(aio):
             lora("NSFW-22-H-e8.safetensors", 2.75, True),
             lora("SmoothXXXAnimation_High.safetensors", 1.5, True),
             lora("Cumshot_Aesthetics_High.safetensors", 1.0),
+            lora("I2V_joi_trend_high.safetensors", 1.0),
             lora(
                 "cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors",
                 1.0,
@@ -396,6 +397,7 @@ def patch_loop(aio):
             lora("NSFW-22-L-e8.safetensors", 1.65, True),
             lora("SmoothXXXAnimation_Low.safetensors", 1.0, True),
             lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
+            lora("I2V_joi_trend_low.safetensors", 1.0),
             lora("cheek_bulge_fellatio_wanvideo_i2v.safetensors", 1.0),
             lora("glans_licking_wanvideo_i2v_epoch5.safetensors", 1.0),
             lora("head_back_wanvideo_i2v_epoch5.safetensors", 1.0),
@@ -407,13 +409,13 @@ def patch_loop(aio):
         ],
     )
 
-    # The five optional High/Low pairs make both loaders taller. Lift the
+    # The optional High/Low pairs make both loaders taller. Lift the
     # loaders into their group so they do not cover the prompt box.
     by_id[325]["pos"][1] = 2365
     by_id[324]["pos"][1] = 2365
     lora_group = next(group for group in graph["groups"] if group["id"] == 45)
     lora_group["bounding"][1] = 2325
-    lora_group["bounding"][3] = 700
+    lora_group["bounding"][3] = 740
 
     resolution = by_id[328]
     resolution["properties"]["valueX"] = 528
@@ -432,9 +434,10 @@ def patch_loop(aio):
         "audio track cannot introduce a seam.\n\n"
         "Core LoRAs are ON: LightX2V 3.0 High / 1.5 Low, NSFW-22 2.75 High / "
         "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Anime Cumshot "
-        "Aesthetics High/Low is available at 1.0 but OFF by default because its "
-        "author targets the official WAN base and warns that AIO/merged models "
-        "may be unstable. Five iroiroLoRA High/Low effect pairs are also "
+        "Aesthetics and JOI Handjob Trend High/Low pairs are available at 1.0 "
+        "but OFF by default. Cumshot Aesthetics targets the official WAN base "
+        "and may be unstable with an AIO/merged model. The JOI pair is native "
+        "WAN 2.2 I2V-A14B. Five iroiroLoRA High/Low effect pairs are also "
         "available at 1.0 and OFF by default; enable one matching pair at a "
         "time. Default base resolution is 528 x 704.\n\n"
         + existing_note
