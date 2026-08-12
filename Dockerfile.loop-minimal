@@ -25,6 +25,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
+# The pinned PyTorch image owns /usr/local/lib/python3.12, so Ubuntu's PEP 668
+# system-package marker is not applicable to this image-managed runtime.
 RUN printf '%s\n' \
         'torch==2.10.0+cu128' \
         'torchvision==0.25.0+cu128' \
@@ -39,7 +41,8 @@ RUN printf '%s\n' \
         git \
         libgl1 \
         libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED
 
 # Use the same ComfyUI revision as the validated RunPod 1.4.4 base, but install
 # only ComfyUI itself. The commit archive avoids shipping another .git object
