@@ -39,6 +39,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # GHCR intermittently rejects simultaneous login/layer uploads from
+      # matrix siblings. Cached variants take seconds; serial publication is
+      # more reliable and does not affect the resulting image pull speed.
+      max-parallel: 1
       matrix:
         include:
           - profile: loop
