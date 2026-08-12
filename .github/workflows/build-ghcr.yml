@@ -45,12 +45,6 @@ jobs:
       max-parallel: 1
       matrix:
         include:
-          - profile: loop
-            dockerfile: Dockerfile
-            node_manifest: custom_nodes.loop.txt
-            image_tags: |
-              ghcr.io/${{ github.repository }}:wan22-loop-fast
-              ghcr.io/${{ github.repository }}:loop-sha-${{ github.sha }}
           - profile: full
             dockerfile: Dockerfile
             node_manifest: custom_nodes.txt
@@ -88,7 +82,8 @@ jobs:
           platforms: linux/amd64
           push: true
           cache-from: type=gha,scope=${{ matrix.profile }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.profile }}
+          # An export outage must not turn a correctly published image red.
+          cache-to: type=gha,mode=min,ignore-error=true,scope=${{ matrix.profile }}
           build-args: |
             BUNDLE_REVISION=${{ github.sha }}
             CUSTOM_NODES_MANIFEST=${{ matrix.node_manifest }}

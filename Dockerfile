@@ -6,10 +6,9 @@
 ARG BASE_IMAGE=runpod/comfyui:1.4.4-cuda12.8@sha256:7078f94dbe28d079c487c245dc3524443e2c6225a6208a1fff8c7a652c1b3a40
 FROM ${BASE_IMAGE}
 
-# The default remains the complete AIO dependency set. CI builds the normal
-# image with this manifest and a smaller loop-only image by overriding it with
-# custom_nodes.loop.txt. Keeping both variants avoids breaking the native,
-# MMAudio, GGUF, and long-video workflows for users of the full image.
+# The default remains the complete AIO dependency set. The separate minimal
+# Dockerfile uses custom_nodes.loop.txt; retaining this build argument also
+# makes local derivative builds deterministic.
 ARG CUSTOM_NODES_MANIFEST=custom_nodes.txt
 ARG IMAGE_PROFILE=full
 

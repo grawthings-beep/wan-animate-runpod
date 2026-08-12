@@ -48,7 +48,6 @@ ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
 ghcr.io/grawthings-beep/wan-animate-runpod:wan22-lightning-longvideo
 ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
 ghcr.io/grawthings-beep/wan-animate-runpod:latest
-ghcr.io/grawthings-beep/wan-animate-runpod:wan22-loop-fast
 ghcr.io/grawthings-beep/wan-animate-runpod:wan22-loop-minimal
 ```
 
