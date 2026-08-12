@@ -100,6 +100,20 @@ class ContainerContractTests(unittest.TestCase):
         self.assertIn('KEEP_CUSTOM_NODE_GIT:-0', installer)
         self.assertIn("-name .git", installer)
 
+    def test_minimal_loop_image_pins_pytorch_and_comfyui(self):
+        dockerfile = (ROOT / "Dockerfile.loop-minimal").read_text(encoding="utf-8")
+
+        self.assertRegex(
+            dockerfile,
+            r"ARG BASE_IMAGE=pytorch/pytorch:2\.10\.0-cuda12\.8-cudnn9-runtime@sha256:[0-9a-f]{64}",
+        )
+        self.assertRegex(dockerfile, r"ARG COMFYUI_COMMIT=[0-9a-f]{40}")
+        self.assertIn("ARG CUSTOM_NODES_MANIFEST=custom_nodes.loop.txt", dockerfile)
+        self.assertNotIn("jupyterlab", dockerfile.lower())
+        self.assertNotIn("openssh-server", dockerfile.lower())
+        self.assertNotIn("filebrowser.tar", dockerfile.lower())
+        self.assertIn("gpu_preflight.py --stack-only", dockerfile)
+
 
 if __name__ == "__main__":
     unittest.main()

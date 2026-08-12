@@ -34,6 +34,7 @@ jobs:
           bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh
 
   build:
+    name: build (${{ matrix.profile }})
     needs: validate
     runs-on: ubuntu-latest
     strategy:
@@ -41,11 +42,13 @@ jobs:
       matrix:
         include:
           - profile: loop
+            dockerfile: Dockerfile
             node_manifest: custom_nodes.loop.txt
             image_tags: |
               ghcr.io/${{ github.repository }}:wan22-loop-fast
               ghcr.io/${{ github.repository }}:loop-sha-${{ github.sha }}
           - profile: full
+            dockerfile: Dockerfile
             node_manifest: custom_nodes.txt
             image_tags: |
               ghcr.io/${{ github.repository }}:latest
@@ -53,6 +56,12 @@ jobs:
               ghcr.io/${{ github.repository }}:wan22-smooth-v6
               ghcr.io/${{ github.repository }}:wan22-lightning-longvideo
               ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
+          - profile: loop-minimal
+            dockerfile: Dockerfile.loop-minimal
+            node_manifest: custom_nodes.loop.txt
+            image_tags: |
+              ghcr.io/${{ github.repository }}:wan22-loop-minimal
+              ghcr.io/${{ github.repository }}:minimal-sha-${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -71,9 +80,10 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
-          cache-from: type=gha
+          cache-from: type=gha,scope=${{ matrix.profile }}
           cache-to: type=gha,mode=max,scope=${{ matrix.profile }}
           build-args: |
             BUNDLE_REVISION=${{ github.sha }}
