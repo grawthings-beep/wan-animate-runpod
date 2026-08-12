@@ -249,6 +249,13 @@ if [[ -n "${COMFYUI_CORS_ORIGIN:-}" ]]; then
   CORS_ARGS=(--enable-cors-header "${COMFYUI_CORS_ORIGIN}")
 fi
 
+# ComfyUI computes its database default from the immutable application path,
+# independently of --user-directory. The minimal image intentionally has no
+# /opt/comfyui-baked/user directory, so keep the database with the rest of the
+# writable user state instead. This is also safe for the full image and can be
+# overridden when an external database is intentionally configured.
+COMFYUI_DATABASE_URL="${COMFYUI_DATABASE_URL:-sqlite:///${WORKSPACE_DIR}/user/comfyui.db}"
+
 cd "${COMFYUI_DIR}"
 log_boot_phase "comfyui-exec"
 exec "${PYTHON_BIN}" main.py \
@@ -257,5 +264,6 @@ exec "${PYTHON_BIN}" main.py \
   --input-directory "${WORKSPACE_DIR}/input" \
   --output-directory "${WORKSPACE_DIR}/output" \
   --user-directory "${WORKSPACE_DIR}/user" \
+  --database-url "${COMFYUI_DATABASE_URL}" \
   "${CORS_ARGS[@]}" \
   "${EXTRA_ARGS[@]}"

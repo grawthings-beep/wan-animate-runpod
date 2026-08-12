@@ -30,6 +30,19 @@ class ContainerContractTests(unittest.TestCase):
         probe_at = start.index("gpu_preflight.py")
         self.assertLess(normalize_at, probe_at)
 
+    def test_database_uses_writable_workspace_user_directory(self):
+        start = (ROOT / "scripts" / "start.sh").read_text(encoding="utf-8")
+
+        self.assertIn(
+            'COMFYUI_DATABASE_URL="${COMFYUI_DATABASE_URL:-sqlite:///${WORKSPACE_DIR}/user/comfyui.db}"',
+            start,
+        )
+        self.assertIn('--database-url "${COMFYUI_DATABASE_URL}"', start)
+        self.assertLess(
+            start.index('"${WORKSPACE_DIR}/user/default/workflows"'),
+            start.index('COMFYUI_DATABASE_URL='),
+        )
+
     def test_bundled_loop_queue_nodes_are_copied_into_comfyui(self):
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
         package = ROOT / "custom_nodes" / "ComfyUI-WanLoopBatch"
