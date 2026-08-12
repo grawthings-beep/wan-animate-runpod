@@ -83,7 +83,7 @@ RUN "$(command -v python || command -v python3)" \
         /opt/runpod-wan-animate/scripts/gpu_preflight.py --stack-only \
     && cd /opt/comfyui-baked \
     && "$(command -v python || command -v python3)" -c \
-        "import aiohttp, av, cv2, transformers; import comfy.model_management"
+        "import aiohttp, av, cv2, transformers, comfy"
 
 ARG BUNDLE_REVISION=unknown
 ENV BUNDLE_REVISION=${BUNDLE_REVISION}
