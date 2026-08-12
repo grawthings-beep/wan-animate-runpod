@@ -6,6 +6,13 @@
 ARG BASE_IMAGE=runpod/comfyui:1.4.4-cuda12.8@sha256:7078f94dbe28d079c487c245dc3524443e2c6225a6208a1fff8c7a652c1b3a40
 FROM ${BASE_IMAGE}
 
+# The default remains the complete AIO dependency set. CI builds the normal
+# image with this manifest and a smaller loop-only image by overriding it with
+# custom_nodes.loop.txt. Keeping both variants avoids breaking the native,
+# MMAudio, GGUF, and long-video workflows for users of the full image.
+ARG CUSTOM_NODES_MANIFEST=custom_nodes.txt
+ARG IMAGE_PROFILE=full
+
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -27,7 +34,7 @@ RUN apt-get update \
         libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY custom_nodes.txt /opt/runpod-wan-animate/custom_nodes.txt
+COPY ${CUSTOM_NODES_MANIFEST} /opt/runpod-wan-animate/custom_nodes.txt
 COPY config/ /opt/runpod-wan-animate/config/
 COPY scripts/ /opt/runpod-wan-animate/scripts/
 COPY workflows/ /opt/runpod-wan-animate/workflows/
@@ -60,7 +67,8 @@ RUN "$(command -v python || command -v python3)" \
 
 ARG BUNDLE_REVISION=unknown
 ENV BUNDLE_REVISION=${BUNDLE_REVISION}
-LABEL org.opencontainers.image.revision="${BUNDLE_REVISION}"
+LABEL org.opencontainers.image.revision="${BUNDLE_REVISION}" \
+      io.grawthings.wan.image-profile="${IMAGE_PROFILE}"
 
 EXPOSE 8188
 

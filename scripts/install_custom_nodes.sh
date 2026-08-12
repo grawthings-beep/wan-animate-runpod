@@ -105,3 +105,15 @@ while IFS='|' read -r name url ref; do
     "${PYTHON_BIN}" -m pip install -e "${target}" || true
   fi
 done < /opt/runpod-wan-animate/custom_nodes.txt
+
+# Git metadata is useful while building but never used by this immutable
+# runtime image. Remove it in the same Docker layer so shallow-pack objects do
+# not have to be pulled by every new Pod. Set KEEP_CUSTOM_NODE_GIT=1 only for a
+# local developer image that intentionally updates nodes with git.
+if [[ "${KEEP_CUSTOM_NODE_GIT:-0}" != "1" ]]; then
+  echo "Removing custom-node build metadata"
+  find "${CUSTOM_NODES_DIR}" -mindepth 2 -maxdepth 2 -type d -name .git \
+    -prune -exec rm -rf -- {} +
+fi
+
+find "${CUSTOM_NODES_DIR}" -type d -name __pycache__ -prune -exec rm -rf -- {} +

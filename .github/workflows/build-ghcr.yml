@@ -36,6 +36,23 @@ jobs:
   build:
     needs: validate
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: loop
+            node_manifest: custom_nodes.loop.txt
+            image_tags: |
+              ghcr.io/${{ github.repository }}:wan22-loop-fast
+              ghcr.io/${{ github.repository }}:loop-sha-${{ github.sha }}
+          - profile: full
+            node_manifest: custom_nodes.txt
+            image_tags: |
+              ghcr.io/${{ github.repository }}:latest
+              ghcr.io/${{ github.repository }}:cuda12.8
+              ghcr.io/${{ github.repository }}:wan22-smooth-v6
+              ghcr.io/${{ github.repository }}:wan22-lightning-longvideo
+              ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,12 +74,9 @@ jobs:
           platforms: linux/amd64
           push: true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,scope=${{ matrix.profile }}
           build-args: |
             BUNDLE_REVISION=${{ github.sha }}
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:cuda12.8
-            ghcr.io/${{ github.repository }}:wan22-smooth-v6
-            ghcr.io/${{ github.repository }}:wan22-lightning-longvideo
-            ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
+            CUSTOM_NODES_MANIFEST=${{ matrix.node_manifest }}
+            IMAGE_PROFILE=${{ matrix.profile }}
+          tags: ${{ matrix.image_tags }}

@@ -1,5 +1,17 @@
 # RunPodテンプレート設定
 
+## ループ専用の高速pull image
+
+Actions成功後、ループ用TemplateのContainer Imageには次を指定します。
+
+```text
+ghcr.io/grawthings-beep/wan-animate-runpod:loop-sha-<40文字のcommit SHA>
+```
+
+これはループに不要なMMAudio、WanVideoWrapper、GGUF、KJNodes、Fill-Nodes、
+長尺動画系custom nodeを除いたimageです。AIO / Native Lightning用の別Templateだけ、
+従来の`sha-<40文字のcommit SHA>`（全入りimage）を使います。
+
 ## 1. Secrets
 
 RunPod ConsoleのSecretsで次を作ります。
@@ -24,7 +36,7 @@ tokenの実値を平文のEnvironment variablesへ貼らないでください。
 
 ```text
 Template type: Pod
-Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
+Container image: ghcr.io/grawthings-beep/wan-animate-runpod:loop-sha-<40文字のcommit SHA>
 Container disk: 50 GB
 Volume disk: 100 GB以上（生成動画を多く残すなら150 GB推奨）
 Volume mount path: /workspace
@@ -106,7 +118,8 @@ TRANSFER ENGINE: 4 files in parallel
 90秒でこの表示になったら、設定変更やStop/Startを繰り返さず、PodをTerminateして同じTemplateから新規デプロイしてください。RTX 5090/Blackwellでdriver 570.26未満の場合は回復不能なので最初の検査で停止します。新しいPodは別の空き物理ホストへ割り当てられます。`incompatible PyTorch runtime`ならイメージのTorch wheel混在、`insufficient /workspace capacity before download`ならGPUではなくVolume Disk不足です。
 
 更新直後はRunPodの可変タグキャッシュを避けるため、GitHub Actionsが発行した
-`ghcr.io/grawthings-beep/wan-animate-runpod:sha-<40文字のcommit SHA>`を
+ループ用は`ghcr.io/grawthings-beep/wan-animate-runpod:loop-sha-<40文字のcommit SHA>`、
+AIO / Native Lightning用は`ghcr.io/grawthings-beep/wan-animate-runpod:sha-<40文字のcommit SHA>`を
 Container Imageに指定します。既存PodのStop/Startではイメージが更新されないため、
 Podを作り直してください。ログ先頭の`BUNDLE REVISION`が指定SHAと一致することも確認します。
 

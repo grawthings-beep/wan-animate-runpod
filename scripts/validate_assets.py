@@ -12,6 +12,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "config" / "wan22-models.json"
 DEPENDENCIES_PATH = ROOT / "config" / "workflow-dependencies.json"
 CUSTOM_NODES_PATH = ROOT / "custom_nodes.txt"
+LOOP_CUSTOM_NODES_PATH = ROOT / "custom_nodes.loop.txt"
 WORKFLOW_PATHS = sorted((ROOT / "workflows").glob("*_runpod.json"))
 MODEL_EXTENSIONS = {".safetensors", ".gguf", ".pth", ".pkl"}
 UUID_TYPE = re.compile(r"^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$", re.I)
@@ -34,26 +35,26 @@ def iter_nodes(workflow):
         yield from subgraph.get("nodes", [])
 
 
-def read_custom_node_names(errors):
+def read_custom_node_names(path, errors):
     names = set()
     for line_number, raw in enumerate(
-        CUSTOM_NODES_PATH.read_text(encoding="utf-8").splitlines(), start=1
+        path.read_text(encoding="utf-8").splitlines(), start=1
     ):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         parts = line.split("|")
         if len(parts) != 3:
-            errors.append(f"custom_nodes.txt:{line_number}: expected name|url|commit")
+            errors.append(f"{path.name}:{line_number}: expected name|url|commit")
             continue
         name, url, commit = parts
         if name in names:
-            errors.append(f"custom_nodes.txt:{line_number}: duplicate {name}")
+            errors.append(f"{path.name}:{line_number}: duplicate {name}")
         names.add(name)
         if urlparse(url).scheme != "https":
-            errors.append(f"custom_nodes.txt:{line_number}: URL must use HTTPS")
+            errors.append(f"{path.name}:{line_number}: URL must use HTTPS")
         if not re.fullmatch(r"[0-9a-f]{40}", commit):
-            errors.append(f"custom_nodes.txt:{line_number}: commit is not pinned")
+            errors.append(f"{path.name}:{line_number}: commit is not pinned")
     return names
 
 
@@ -123,14 +124,15 @@ def validate_workflows(
     dependencies,
     manifest_profiles,
     errors,
+    workflow_paths=WORKFLOW_PATHS,
 ):
     core = set(dependencies.get("core_node_types") or [])
     custom = dependencies.get("custom_node_types") or {}
-    if not WORKFLOW_PATHS:
+    if not workflow_paths:
         errors.append("no generated RunPod workflows found")
         return
 
-    for path in WORKFLOW_PATHS:
+    for path in workflow_paths:
         workflow = json.loads(path.read_text(encoding="utf-8"))
         bundle = workflow.get("extra", {}).get("runpod_bundle", {})
         profile = bundle.get("profile")
@@ -179,13 +181,20 @@ def main():
     errors = []
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     dependencies = json.loads(DEPENDENCIES_PATH.read_text(encoding="utf-8"))
-    installed_packs = read_custom_node_names(errors)
+    installed_packs = read_custom_node_names(CUSTOM_NODES_PATH, errors)
+    loop_installed_packs = read_custom_node_names(LOOP_CUSTOM_NODES_PATH, errors)
+    if not loop_installed_packs.issubset(installed_packs):
+        errors.append(
+            "custom_nodes.loop.txt contains packs absent from custom_nodes.txt: "
+            f"{sorted(loop_installed_packs - installed_packs)}"
+        )
     bundled_packs = dependencies.get("bundled_custom_node_packs") or []
     for pack in bundled_packs:
         package = ROOT / "custom_nodes" / pack
         if not (package / "__init__.py").is_file():
             errors.append(f"bundled custom-node pack is missing: {pack}")
         installed_packs.add(pack)
+        loop_installed_packs.add(pack)
     provided, basename_groups = validate_manifest(manifest, errors)
     validate_workflows(
         provided,
@@ -195,6 +204,17 @@ def main():
         manifest.get("profiles") or {},
         errors,
     )
+    validate_workflows(
+        provided,
+        basename_groups,
+        loop_installed_packs,
+        dependencies,
+        manifest.get("profiles") or {},
+        errors,
+        workflow_paths=[
+            path for path in WORKFLOW_PATHS if "seamless_loop" in path.name
+        ],
+    )
 
     if errors:
         for error in errors:
@@ -202,7 +222,8 @@ def main():
         return 1
     print(
         f"OK: {len(WORKFLOW_PATHS)} workflows, "
-        f"{len(manifest['models'])} assets, {len(installed_packs)} custom-node packs"
+        f"{len(manifest['models'])} assets, {len(installed_packs)} full packs, "
+        f"{len(loop_installed_packs)} loop packs"
     )
     return 0
 

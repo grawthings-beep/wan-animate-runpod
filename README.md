@@ -1,5 +1,28 @@
 # WAN 2.2 ComfyUI on RunPod
 
+## Fast loop image
+
+ループ専用RunPod Templateでは、Actionsが発行する次のimmutable tagを使います。
+
+```text
+ghcr.io/grawthings-beep/wan-animate-runpod:loop-sha-<40文字のcommit SHA>
+```
+
+このimageは4種類のseamless-loop workflowに必要なcustom nodeだけを含みます。
+MMAudio、WanVideoWrapper、GGUF、KJNodes、Fill-Nodes、長尺動画系を焼かないため、
+全入りimageよりpullが小さくなります。`wan22-loop-fast`は同内容の便利な可変tagですが、
+RunPodの古いimage cacheを避けるため、本番では`loop-sha-*`を推奨します。
+AIO / Native Lightning / MMAudioを使う場合だけ従来の`sha-<commit SHA>`を使います。
+
+起動ログの次の3行で、container process開始後にCUDA確認とモデル取得がそれぞれ何秒
+かかったかを分離できます。image pull時間はcontainer開始前なのでRunPod画面側で確認します。
+
+```text
+BOOT PHASE: cuda-preflight-complete elapsed=...s
+BOOT PHASE: model-download-complete elapsed=...s
+BOOT PHASE: comfyui-exec elapsed=...s
+```
+
 ## 10本を順番に生成してZIPを自動ダウンロード
 
 `wan22_smooth_v6_seamless_loop_batch10_runpod` は、10枚の画像と10個の対応するpositive promptを登録できる派生ワークフローです。専用の `QUEUE 10 LOOPS (SEQUENTIAL)` ボタンを1回押すと、通常のループ生成を独立した10件のComfyUIジョブとして順番に登録します。同時バッチではないため、1本が終了してVRAMを解放してから次の1本へ進みます。
@@ -24,6 +47,7 @@ ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
 ghcr.io/grawthings-beep/wan-animate-runpod:wan22-lightning-longvideo
 ghcr.io/grawthings-beep/wan-animate-runpod:cuda12.8
 ghcr.io/grawthings-beep/wan-animate-runpod:latest
+ghcr.io/grawthings-beep/wan-animate-runpod:wan22-loop-fast
 ```
 
 RunPodから認証なしでpullする場合、GitHub PackagesでパッケージをPublicにしてください。
@@ -32,7 +56,7 @@ RunPodから認証なしでpullする場合、GitHub Packagesでパッケージ�
 
 ```text
 Template type: Pod
-Container image: ghcr.io/grawthings-beep/wan-animate-runpod:wan22-smooth-v6
+Container image: ghcr.io/grawthings-beep/wan-animate-runpod:loop-sha-<40文字のcommit SHA>
 Container disk: 50 GB
 Volume disk: 100 GB以上（生成動画を多く残すなら150 GB推奨）
 Volume mount path: /workspace
@@ -97,7 +121,7 @@ Network Volumeを使わなくても、RunPodのローカルVolume Diskは`/works
 
 `loop-quality`が既定です。First-to-Last Frameの実行経路だけを残し、LightX2V rank128、NSFW-22 High/Low、SmoothXXXAnimation High/Low、Anime Cumshot Aesthetics High/Low、JOI Handjob Trend High/Low、iroiroLoRA High/Low 5組を取得します。別ブランチのLoRA、未接続GGUF、MMAudioはダウンロードもworkflow表示も行いません。`lightning-longvideo`を明示した場合だけNative Enhanced Lightning用assetを取得します。
 
-RunPodは同じ可変Dockerタグをキャッシュする場合があります。更新直後のPodで古いworkflowや不足モデルが表示された場合は、既存PodのStop/Startではなく新規Podを作成し、Actionsが発行する`sha-<40文字のcommit SHA>`タグをContainer Imageに指定してください。起動ログの`BUNDLE REVISION`がそのSHAと一致し、`[check_env] ... required_missing=0`になるまでComfyUIは起動しません。
+RunPodは同じ可変Dockerタグをキャッシュする場合があります。更新直後のPodで古いworkflowや不足モデルが表示された場合は、既存PodのStop/Startではなく新規Podを作成し、ループ用ならActionsが発行する`loop-sha-<40文字のcommit SHA>`タグをContainer Imageに指定してください。起動ログの`BUNDLE REVISION`がそのSHAと一致し、`[check_env] ... required_missing=0`になるまでComfyUIは起動しません。
 
 ループworkflowのLoRA:
 

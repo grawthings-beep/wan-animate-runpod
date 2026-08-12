@@ -3,6 +3,14 @@ set -Eeuo pipefail
 
 source /opt/runpod-wan-animate/scripts/common.sh
 
+BOOT_STARTED_EPOCH="$(date +%s)"
+log_boot_phase() {
+  local phase="$1"
+  local now
+  now="$(date +%s)"
+  echo "BOOT PHASE: ${phase} elapsed=$((now - BOOT_STARTED_EPOCH))s"
+}
+
 COMFYUI_DIR="$(find_comfyui_dir)" || {
   echo "ERROR: could not find ComfyUI main.py. Set COMFYUI_DIR explicitly." >&2
   exit 2
@@ -94,6 +102,7 @@ else
     --python "${PYTHON_BIN}" \
     --stack-only
 fi
+log_boot_phase "cuda-preflight-complete"
 
 write_extra_model_paths() {
   local target="$1"
@@ -185,6 +194,7 @@ if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
 else
   echo "Skipping model downloads (DOWNLOAD_MODELS=${DOWNLOAD_MODELS:-0})."
 fi
+log_boot_phase "model-download-complete"
 
 # These two interpolation extensions look only inside their own repository.
 # Link their verified volume assets so they never redownload on a new pod.
@@ -200,12 +210,16 @@ link_runtime_asset() {
 link_runtime_asset \
   "${MODEL_ROOT}/models/rife/rife49.pth" \
   "${COMFYUI_DIR}/custom_nodes/ComfyUI-Frame-Interpolation/models/rife/rife49.pth"
-link_runtime_asset \
-  "${MODEL_ROOT}/models/rife/flownet.pkl" \
-  "${COMFYUI_DIR}/custom_nodes/ComfyUI-VFI/rife/train_log/flownet.pkl"
-link_runtime_asset \
-  "${MODEL_ROOT}/models/rife/rife49.pth" \
-  "${COMFYUI_DIR}/custom_nodes/ComfyUI_Fill-Nodes/nodes/cache/rife_models/rife49.pth"
+if [[ -d "${COMFYUI_DIR}/custom_nodes/ComfyUI-VFI" ]]; then
+  link_runtime_asset \
+    "${MODEL_ROOT}/models/rife/flownet.pkl" \
+    "${COMFYUI_DIR}/custom_nodes/ComfyUI-VFI/rife/train_log/flownet.pkl"
+fi
+if [[ -d "${COMFYUI_DIR}/custom_nodes/ComfyUI_Fill-Nodes" ]]; then
+  link_runtime_asset \
+    "${MODEL_ROOT}/models/rife/rife49.pth" \
+    "${COMFYUI_DIR}/custom_nodes/ComfyUI_Fill-Nodes/nodes/cache/rife_models/rife49.pth"
+fi
 
 # ComfyUI-MMAudio chooses the first mmaudio folder for its BigVGAN snapshot.
 # Ensure the base-model directory points at the persistent copy as well.
@@ -236,6 +250,7 @@ if [[ -n "${COMFYUI_CORS_ORIGIN:-}" ]]; then
 fi
 
 cd "${COMFYUI_DIR}"
+log_boot_phase "comfyui-exec"
 exec "${PYTHON_BIN}" main.py \
   --listen "${LISTEN}" \
   --port "${PORT}" \

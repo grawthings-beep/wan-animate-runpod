@@ -69,6 +69,37 @@ class ContainerContractTests(unittest.TestCase):
         self.assertTrue(all(len(entry) == 3 for entry in entries))
         self.assertTrue(all(re.fullmatch(r"[0-9a-f]{40}", entry[2]) for entry in entries))
 
+    def test_loop_image_uses_a_separate_minimal_node_manifest(self):
+        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+        full_manifest = (ROOT / "custom_nodes.txt").read_text(encoding="utf-8")
+        loop_manifest = (ROOT / "custom_nodes.loop.txt").read_text(encoding="utf-8")
+
+        def names(text):
+            return {
+                line.split("|", 1)[0]
+                for line in text.splitlines()
+                if line and not line.startswith("#")
+            }
+
+        loop_names = names(loop_manifest)
+        full_names = names(full_manifest)
+        self.assertIn("ARG CUSTOM_NODES_MANIFEST=custom_nodes.txt", dockerfile)
+        self.assertIn(
+            "COPY ${CUSTOM_NODES_MANIFEST} /opt/runpod-wan-animate/custom_nodes.txt",
+            dockerfile,
+        )
+        self.assertTrue(loop_names < full_names)
+        self.assertNotIn("ComfyUI-MMAudio", loop_names)
+        self.assertNotIn("ComfyUI-WanVideoWrapper", loop_names)
+        self.assertNotIn("ComfyUI-GGUF", loop_names)
+
+    def test_image_build_removes_git_metadata_in_the_same_layer(self):
+        installer = (ROOT / "scripts" / "install_custom_nodes.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('KEEP_CUSTOM_NODE_GIT:-0', installer)
+        self.assertIn("-name .git", installer)
+
 
 if __name__ == "__main__":
     unittest.main()
