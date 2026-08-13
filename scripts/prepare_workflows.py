@@ -21,20 +21,38 @@ LIGHTNING_SOURCE = (
 OUTPUTS = {
     "aio": ROOT / "workflows" / "wan22_smooth_v6_aio_runpod.json",
     "loop": ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json",
+    "loop_core": (
+        ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_core_runpod.json"
+    ),
     "batch10": (
         ROOT
         / "workflows"
         / "wan22_smooth_v6_seamless_loop_batch10_runpod.json"
+    ),
+    "batch10_core": (
+        ROOT
+        / "workflows"
+        / "wan22_smooth_v6_seamless_loop_batch10_core_runpod.json"
     ),
     "loop_mosaic": (
         ROOT
         / "workflows"
         / "wan22_smooth_v6_seamless_loop_auto_mosaic_runpod.json"
     ),
+    "loop_mosaic_core": (
+        ROOT
+        / "workflows"
+        / "wan22_smooth_v6_seamless_loop_core_auto_mosaic_runpod.json"
+    ),
     "batch10_mosaic": (
         ROOT
         / "workflows"
         / "wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod.json"
+    ),
+    "batch10_mosaic_core": (
+        ROOT
+        / "workflows"
+        / "wan22_smooth_v6_seamless_loop_batch10_core_auto_mosaic_runpod.json"
     ),
     "lightning": (
         ROOT
@@ -448,7 +466,38 @@ def patch_loop(aio):
         combine["loop_count"] = 0
 
     graph.setdefault("extra", {})["runpod_bundle"]["preset"] = "seamless-loop"
-    graph["extra"]["runpod_bundle"]["profile"] = "loop-quality"
+    graph["extra"]["runpod_bundle"]["profile"] = "loop-all"
+    return graph
+
+
+def patch_loop_core(loop):
+    """Remove every disabled optional LoRA from the production core preset."""
+    graph = copy.deepcopy(loop)
+    for node in graph.get("nodes", []):
+        if node.get("type") != "Power Lora Loader (rgthree)":
+            continue
+        enabled = [
+            copy.deepcopy(item)
+            for item in node.get("widgets_values", [])
+            if isinstance(item, dict) and item.get("lora") and item.get("on")
+        ]
+        configure_lora_node(node, enabled)
+
+    note = next((node for node in graph["nodes"] if node.get("id") == 323), None)
+    if note:
+        note["widgets_values"] = (
+            "LOOP CORE PRESET\n\n"
+            "Only the enabled LightX2V, NSFW-22, and SmoothXXXAnimation "
+            "High/Low pairs are present. This avoids downloading 5.17 GB of "
+            "disabled optional LoRAs and prevents false missing-model notices. "
+            "Use the non-core workflow with MODEL_PROFILE=loop-all when those "
+            "optional effects are needed.\n\n"
+            + str(note.get("widgets_values") or "")
+        )
+
+    bundle = graph.setdefault("extra", {}).setdefault("runpod_bundle", {})
+    bundle["preset"] = "seamless-loop-core"
+    bundle["profile"] = "loop-core"
     return graph
 
 
@@ -688,7 +737,7 @@ def patch_loop_batch10(loop):
     bundle.update(
         {
             "preset": "seamless-loop-batch10-sequential",
-            "profile": "loop-quality",
+            "profile": bundle.get("profile", "loop-all"),
             "queue_jobs": 10,
             "auto_download": "zip-after-final-job",
         }
@@ -868,7 +917,7 @@ def patch_auto_mosaic(loop, batch10=False):
                 if batch10
                 else "seamless-loop-auto-mosaic"
             ),
-            "profile": "loop-quality",
+            "profile": bundle.get("profile", "loop-all"),
             "postprocess": "Anime NSFW Detection v5 YOLO11-seg JUST contour mosaic after RIFE (CPU)",
             "requires_all_referenced_assets": True,
         }
@@ -989,13 +1038,21 @@ def main():
     )
     aio = patch_aio(smooth_source)
     loop = patch_loop(aio)
+    loop_core = patch_loop_core(loop)
     batch10 = patch_loop_batch10(loop)
+    batch10_core = patch_loop_batch10(loop_core)
     generated = {
         "aio": encode(aio),
         "loop": encode(loop),
+        "loop_core": encode(loop_core),
         "batch10": encode(batch10),
+        "batch10_core": encode(batch10_core),
         "loop_mosaic": encode(patch_auto_mosaic(loop)),
+        "loop_mosaic_core": encode(patch_auto_mosaic(loop_core)),
         "batch10_mosaic": encode(patch_auto_mosaic(batch10, batch10=True)),
+        "batch10_mosaic_core": encode(
+            patch_auto_mosaic(batch10_core, batch10=True)
+        ),
         "lightning": encode(patch_lightning(lightning_source)),
     }
 

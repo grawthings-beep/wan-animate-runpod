@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1.7
+
+# Production loop image. CI overrides these arguments as a matched set for
+# Ada/cu128 and Blackwell/cu130. The default is the pinned linux/amd64 Ada base.
+ARG BASE_IMAGE=runpod/comfyui:1.4.4-cuda12.8@sha256:7078f94dbe28d079c487c245dc3524443e2c6225a6208a1fff8c7a652c1b3a40
+FROM ${BASE_IMAGE}
+
+ARG BASE_IMAGE
+ARG EXPECTED_TORCH_VERSION=2.10.0+cu128
+ARG EXPECTED_TORCHVISION_VERSION=0.25.0+cu128
+ARG EXPECTED_TORCHAUDIO_VERSION=2.10.0+cu128
+ARG EXPECTED_TORCH_CUDA=12.8
+ARG WAN_GPU_FAMILY=ada
+ARG IMAGE_PROFILE=loop-ada-cu128
+ARG BUNDLE_REVISION=unknown
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_CONSTRAINT=/opt/comfyui-runtime-constraints.txt \
+    EXPECTED_TORCH_VERSION=${EXPECTED_TORCH_VERSION} \
+    EXPECTED_TORCHVISION_VERSION=${EXPECTED_TORCHVISION_VERSION} \
+    EXPECTED_TORCHAUDIO_VERSION=${EXPECTED_TORCHAUDIO_VERSION} \
+    EXPECTED_TORCH_CUDA=${EXPECTED_TORCH_CUDA} \
+    WAN_GPU_FAMILY=${WAN_GPU_FAMILY} \
+    BUNDLE_REVISION=${BUNDLE_REVISION}
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends aria2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dependency layers depend only on pinned manifests. Changes to workflows,
+# downloader code, or documentation no longer invalidate the expensive node
+# installation layer.
+COPY custom_nodes.loop.txt /opt/runpod-wan-animate/custom_nodes.txt
+COPY scripts/common.sh scripts/install_custom_nodes.sh /opt/runpod-wan-animate/scripts/
+RUN chmod +x /opt/runpod-wan-animate/scripts/*.sh \
+    && /opt/runpod-wan-animate/scripts/install_custom_nodes.sh
+
+COPY custom_nodes/ComfyUI-WanLoopBatch/requirements.txt /tmp/wan-loop-requirements.txt
+RUN "$(command -v python || command -v python3)" -m pip install --no-cache-dir \
+        -r /tmp/wan-loop-requirements.txt \
+    && rm -f /tmp/wan-loop-requirements.txt \
+    && "$(command -v python || command -v python3)" -c \
+        "import ultralytics; assert ultralytics.__version__ == '8.4.104'"
+
+RUN set -eu; \
+    PYTHON_BIN="$(command -v python || command -v python3)"; \
+    "${PYTHON_BIN}" -m pip install --no-cache-dir \
+        --target /opt/runpod-wan-animate/downloader-libs \
+        huggingface_hub==1.24.0 \
+        hf-xet==1.5.2
+
+# Volatile bundle content comes last to maximize registry-cache reuse.
+COPY custom_nodes/ComfyUI-WanLoopBatch/ /opt/comfyui-baked/custom_nodes/ComfyUI-WanLoopBatch/
+COPY config/ /opt/runpod-wan-animate/config/
+COPY workflows/ /opt/runpod-wan-animate/workflows/
+COPY scripts/ /opt/runpod-wan-animate/scripts/
+
+RUN chmod +x /opt/runpod-wan-animate/scripts/*.sh \
+    && "$(command -v python || command -v python3)" \
+        /opt/runpod-wan-animate/scripts/gpu_preflight.py --stack-only \
+    && /opt/runpod-wan-animate/scripts/container_smoke.sh
+
+LABEL org.opencontainers.image.revision="${BUNDLE_REVISION}" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}" \
+      io.grawthings.wan.image-profile="${IMAGE_PROFILE}" \
+      io.grawthings.wan.gpu-family="${WAN_GPU_FAMILY}" \
+      io.grawthings.wan.cuda="${EXPECTED_TORCH_CUDA}"
+
+EXPOSE 8188
+WORKDIR /opt/comfyui-baked
+ENTRYPOINT []
+CMD ["/opt/runpod-wan-animate/scripts/start.sh"]

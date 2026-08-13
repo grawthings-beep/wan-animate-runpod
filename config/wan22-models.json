@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "default_profile": "loop-quality",
+  "default_profile": "loop-all",
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
@@ -10,8 +10,16 @@
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
+    "loop-core": {
+      "description": "Production seamless-loop pack with only the three enabled High/Low LoRA pairs, core encoders, RIFE 4.9, and the CPU contour-mosaic detector. No disabled optional LoRAs are downloaded or shown.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49", "auto-mosaic"]
+    },
+    "loop-all": {
+      "description": "Complete seamless-loop pack. Adds Cumshot Aesthetics, JOI Handjob Trend, and all five iroiroLoRA High/Low pairs to loop-core for optional manual use.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
+    },
     "loop-quality": {
-      "description": "Lean, silent first/last-frame loop workspace. Includes the connected SmoothMix I2V pair, active LightX2V rank128 accelerator, NSFW-22 and SmoothXXXAnimation High/Low pairs, optional Anime Cumshot Aesthetics and JOI Handjob Trend High/Low pairs, five optional iroiroLoRA High/Low effect pairs, CLIP/VAE/text encoder, RIFE, and the contour segmentation model used by the separate CPU auto-mosaic workflows.",
+      "description": "Deprecated compatibility alias for loop-all. New templates should use loop-core or loop-all.",
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
     },
     "t2v-quality": {

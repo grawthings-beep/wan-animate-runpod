@@ -37,7 +37,7 @@ WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace/comfyui}"
 MODEL_ROOT="${MODEL_ROOT:-${WORKSPACE_DIR}}"
 CONFIG_DIR="${CONFIG_DIR:-/workspace/config}"
 MODEL_MANIFEST="${MODEL_MANIFEST:-${CONFIG_DIR}/wan22-models.json}"
-MODEL_PROFILE="${MODEL_PROFILE:-loop-quality}"
+MODEL_PROFILE="${MODEL_PROFILE:-loop-all}"
 PORT="${PORT:-8188}"
 LISTEN="${LISTEN:-0.0.0.0}"
 export MODEL_ROOT
@@ -87,6 +87,78 @@ mkdir -p \
   "${TORCH_HOME}" \
   "${YOLO_CONFIG_DIR}"
 
+BOOTSTRAP_STATUS_FILE="${BOOTSTRAP_STATUS_FILE:-${CONFIG_DIR}/bootstrap-status.json}"
+BOOTSTRAP_STATUS_PID=""
+
+bootstrap_status_write() {
+  if [[ "${BOOTSTRAP_STATUS:-1}" != "1" ]]; then
+    return 0
+  fi
+  "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/bootstrap_status.py write \
+    --file "${BOOTSTRAP_STATUS_FILE}" "$@"
+}
+
+bootstrap_failure() {
+  local exit_code="$1"
+  local line_number="$2"
+  trap - ERR
+  set +e
+  echo "BOOT FAILED: exit=${exit_code} line=${line_number}" >&2
+  bootstrap_status_write \
+    --state failed \
+    --phase failed \
+    --message "WAN loop startup failed" \
+    --detail "Exit ${exit_code} at start.sh line ${line_number}. Check the Pod logs for the exact error."
+  if [[ -n "${BOOTSTRAP_STATUS_PID}" ]] && kill -0 "${BOOTSTRAP_STATUS_PID}" 2>/dev/null; then
+    failure_hold="${BOOT_FAILURE_HOLD_SECONDS:-900}"
+    if [[ "${failure_hold}" =~ ^[0-9]+$ ]] && ((failure_hold > 0)); then
+      echo "BOOT STATUS: preserving the failure page for ${failure_hold}s." >&2
+      sleep "${failure_hold}"
+    fi
+    kill "${BOOTSTRAP_STATUS_PID}" 2>/dev/null || true
+    wait "${BOOTSTRAP_STATUS_PID}" 2>/dev/null || true
+  fi
+  exit "${exit_code}"
+}
+
+if [[ "${BOOTSTRAP_STATUS:-1}" == "1" ]]; then
+  bootstrap_status_write \
+    --state initializing \
+    --phase cuda-preflight \
+    --message "GPUとCUDA runtimeを確認しています"
+  "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/bootstrap_status.py serve \
+    --file "${BOOTSTRAP_STATUS_FILE}" \
+    --host "${LISTEN}" \
+    --port "${PORT}" &
+  BOOTSTRAP_STATUS_PID="$!"
+  trap 'bootstrap_failure $? $LINENO' ERR
+  status_ready=0
+  for _status_attempt in {1..20}; do
+    if ! kill -0 "${BOOTSTRAP_STATUS_PID}" 2>/dev/null; then
+      break
+    fi
+    if "${PYTHON_BIN}" - "${PORT}" <<'PY'
+import sys
+import urllib.request
+
+with urllib.request.urlopen(
+    f"http://127.0.0.1:{sys.argv[1]}/healthz", timeout=0.25
+) as response:
+    if response.status != 200:
+        raise RuntimeError(f"unexpected status {response.status}")
+PY
+    then
+      status_ready=1
+      break
+    fi
+    sleep 0.1
+  done
+  if [[ "${status_ready}" != "1" ]]; then
+    echo "ERROR: bootstrap status server could not bind HTTP port ${PORT}." >&2
+    false
+  fi
+fi
+
 # A broken RunPod host can expose the GPU through nvidia-smi while every CUDA
 # call fails. Detect that before paying the time and bandwidth for 40+ GB.
 if [[ "${CUDA_PREFLIGHT:-1}" == "1" ]]; then
@@ -97,12 +169,16 @@ if [[ "${CUDA_PREFLIGHT:-1}" == "1" ]]; then
 else
   echo "WARN: GPU preflight disabled (CUDA_PREFLIGHT=${CUDA_PREFLIGHT:-0})." >&2
   # Disabling the host probe must not permit custom-node installs to silently
-  # replace the pinned cu128 PyTorch/TorchVision/TorchAudio stack.
+  # replace the pinned PyTorch/TorchVision/TorchAudio CUDA stack.
   "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/gpu_preflight.py \
     --python "${PYTHON_BIN}" \
     --stack-only
 fi
 log_boot_phase "cuda-preflight-complete"
+bootstrap_status_write \
+  --state initializing \
+  --phase workflows \
+  --message "ループworkflowを準備しています"
 
 write_extra_model_paths() {
   local target="$1"
@@ -186,7 +262,13 @@ fi
 
 if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
   DOWNLOADER_LIBS="/opt/runpod-wan-animate/downloader-libs"
-  env PYTHONPATH="${DOWNLOADER_LIBS}${PYTHONPATH:+:${PYTHONPATH}}" \
+  bootstrap_status_write \
+    --state initializing \
+    --phase models \
+    --message "モデルとLoRAを高速ダウンロードしています"
+  env \
+    BOOTSTRAP_STATUS_FILE="${BOOTSTRAP_STATUS_FILE}" \
+    PYTHONPATH="${DOWNLOADER_LIBS}${PYTHONPATH:+:${PYTHONPATH}}" \
     "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/download_models.py \
     --manifest "${MODEL_MANIFEST}" \
     --root "${MODEL_ROOT}" \
@@ -195,6 +277,10 @@ else
   echo "Skipping model downloads (DOWNLOAD_MODELS=${DOWNLOAD_MODELS:-0})."
 fi
 log_boot_phase "model-download-complete"
+bootstrap_status_write \
+  --state initializing \
+  --phase validation \
+  --message "取得済みassetとComfyUI nodeを検証しています"
 
 # These two interpolation extensions look only inside their own repository.
 # Link their verified volume assets so they never redownload on a new pod.
@@ -243,6 +329,17 @@ if [[ "${RUN_DEP_CHECK:-1}" == "1" ]]; then
     "${CHECK_ARGS[@]}"
 fi
 
+bootstrap_status_write \
+  --state handoff \
+  --phase ready \
+  --message "準備完了。ComfyUIへ切り替えます"
+
+if [[ -n "${BOOTSTRAP_STATUS_PID}" ]]; then
+  kill "${BOOTSTRAP_STATUS_PID}" 2>/dev/null || true
+  wait "${BOOTSTRAP_STATUS_PID}" 2>/dev/null || true
+  BOOTSTRAP_STATUS_PID=""
+fi
+
 read -r -a EXTRA_ARGS <<< "${COMFYUI_ARGS:---reserve-vram 3}"
 CORS_ARGS=()
 if [[ -n "${COMFYUI_CORS_ORIGIN:-}" ]]; then
@@ -250,7 +347,7 @@ if [[ -n "${COMFYUI_CORS_ORIGIN:-}" ]]; then
 fi
 
 # ComfyUI computes its database default from the immutable application path,
-# independently of --user-directory. The minimal image intentionally has no
+# independently of --user-directory. The production image intentionally has no
 # /opt/comfyui-baked/user directory, so keep the database with the rest of the
 # writable user state instead. This is also safe for the full image and can be
 # overridden when an external database is intentionally configured.

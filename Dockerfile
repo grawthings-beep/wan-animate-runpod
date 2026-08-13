@@ -1,14 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
 # Pin the linux/amd64 manifest, not only the mutable Docker Hub tag. The digest
-# contains the CUDA 12.8 / torch 2.10.0 runtime validated for RTX 5090.
+# contains the legacy CUDA 12.8 / torch 2.10.0 runtime for non-Blackwell GPUs.
 # Override only when intentionally qualifying a new complete runtime stack.
 ARG BASE_IMAGE=runpod/comfyui:1.4.4-cuda12.8@sha256:7078f94dbe28d079c487c245dc3524443e2c6225a6208a1fff8c7a652c1b3a40
 FROM ${BASE_IMAGE}
 
-# The default remains the complete AIO dependency set. The separate minimal
-# Dockerfile uses custom_nodes.loop.txt; retaining this build argument also
-# makes local derivative builds deterministic.
+# This manual-only legacy image retains the complete AIO dependency set. The
+# production loop image is built from Dockerfile.loop.
 ARG CUSTOM_NODES_MANIFEST=custom_nodes.txt
 ARG IMAGE_PROFILE=full
 
@@ -20,7 +19,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     EXPECTED_TORCH_VERSION=2.10.0+cu128 \
     EXPECTED_TORCHVISION_VERSION=0.25.0+cu128 \
     EXPECTED_TORCHAUDIO_VERSION=2.10.0+cu128 \
-    EXPECTED_TORCH_CUDA=12.8
+    EXPECTED_TORCH_CUDA=12.8 \
+    WAN_GPU_FAMILY=ada
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

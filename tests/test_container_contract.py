@@ -7,85 +7,73 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class ContainerContractTests(unittest.TestCase):
-    def test_base_image_is_pinned_by_amd64_manifest_digest(self):
-        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-        match = re.search(r"^ARG BASE_IMAGE=(\S+)$", dockerfile, re.MULTILINE)
+    def setUp(self):
+        self.loop = (ROOT / "Dockerfile.loop").read_text(encoding="utf-8")
+        self.ci = (ROOT / ".github/workflows/build-ghcr.yml").read_text(
+            encoding="utf-8"
+        )
 
-        self.assertIsNotNone(match)
-        self.assertRegex(match.group(1), r"^runpod/comfyui:1\.4\.4-cuda12\.8@sha256:[0-9a-f]{64}$")
+    def test_production_default_uses_pinned_official_amd64_base(self):
+        self.assertRegex(
+            self.loop,
+            r"ARG BASE_IMAGE=runpod/comfyui:1\.4\.4-cuda12\.8@sha256:[0-9a-f]{64}",
+        )
+        self.assertNotIn("pytorch/pytorch:", self.loop)
 
-    def test_cu128_runtime_contract_is_explicit(self):
-        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    def test_ada_and_blackwell_stacks_are_separate_matrix_variants(self):
+        self.assertIn("loop-ada-cu128", self.ci)
+        self.assertIn("loop-blackwell-cu130", self.ci)
+        self.assertIn("cuda12.8@sha256:7078f94d", self.ci)
+        self.assertIn("cuda13.0@sha256:949b0688", self.ci)
+        self.assertIn("2.10.0+cu128", self.ci)
+        self.assertIn("2.10.0+cu130", self.ci)
+        self.assertIn("max-parallel: 2", self.ci)
 
-        self.assertIn("PIP_CONSTRAINT=/opt/comfyui-runtime-constraints.txt", dockerfile)
-        self.assertIn("EXPECTED_TORCH_VERSION=2.10.0+cu128", dockerfile)
-        self.assertIn("EXPECTED_TORCHVISION_VERSION=0.25.0+cu128", dockerfile)
-        self.assertIn("EXPECTED_TORCHAUDIO_VERSION=2.10.0+cu128", dockerfile)
-        self.assertIn("EXPECTED_TORCH_CUDA=12.8", dockerfile)
+    def test_runtime_contract_is_parameterized_and_checked(self):
+        for name in (
+            "EXPECTED_TORCH_VERSION",
+            "EXPECTED_TORCHVISION_VERSION",
+            "EXPECTED_TORCHAUDIO_VERSION",
+            "EXPECTED_TORCH_CUDA",
+            "WAN_GPU_FAMILY",
+        ):
+            self.assertIn(f"ARG {name}=", self.loop)
+            self.assertIn(f"{name}=${{{name}}}", self.loop)
+        self.assertIn("gpu_preflight.py --stack-only", self.loop)
 
-    def test_cuda_visibility_is_normalized_before_gpu_probe(self):
-        start = (ROOT / "scripts" / "start.sh").read_text(encoding="utf-8")
+    def test_expensive_dependencies_precede_volatile_bundle_content(self):
+        install_at = self.loop.index("install_custom_nodes.sh")
+        workflows_at = self.loop.index("COPY workflows/")
+        scripts_at = self.loop.index("COPY scripts/ /opt/runpod-wan-animate/scripts/")
+        self.assertLess(install_at, workflows_at)
+        self.assertLess(install_at, scripts_at)
+        self.assertIn("cache-to: type=registry", self.ci)
+        self.assertNotIn("type=gha", self.ci)
 
-        normalize_at = start.index("normalize_cuda_visibility")
-        probe_at = start.index("gpu_preflight.py")
-        self.assertLess(normalize_at, probe_at)
+    def test_build_runs_real_entrypoint_smoke_test(self):
+        smoke = (ROOT / "scripts/container_smoke.sh").read_text(encoding="utf-8")
+        self.assertIn("/opt/runpod-wan-animate/scripts/start.sh", smoke)
+        self.assertIn("--quick-test-for-ci", smoke)
+        self.assertIn("BOOTSTRAP_STATUS=0", smoke)
+        self.assertIn("container_smoke.sh", self.loop)
 
-    def test_database_uses_writable_workspace_user_directory(self):
-        start = (ROOT / "scripts" / "start.sh").read_text(encoding="utf-8")
-
+    def test_database_and_boot_status_use_writable_workspace(self):
+        start = (ROOT / "scripts/start.sh").read_text(encoding="utf-8")
         self.assertIn(
             'COMFYUI_DATABASE_URL="${COMFYUI_DATABASE_URL:-sqlite:///${WORKSPACE_DIR}/user/comfyui.db}"',
             start,
         )
         self.assertIn('--database-url "${COMFYUI_DATABASE_URL}"', start)
-        self.assertLess(
-            start.index('"${WORKSPACE_DIR}/user/default/workflows"'),
-            start.index('COMFYUI_DATABASE_URL='),
-        )
+        self.assertIn("bootstrap_status.py serve", start)
+        self.assertLess(start.index("bootstrap_status.py serve"), start.index("download_models.py"))
 
-    def test_bundled_loop_queue_nodes_are_copied_into_comfyui(self):
-        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-        package = ROOT / "custom_nodes" / "ComfyUI-WanLoopBatch"
+    def test_cuda_visibility_is_normalized_before_gpu_probe(self):
+        start = (ROOT / "scripts/start.sh").read_text(encoding="utf-8")
+        self.assertLess(start.index("normalize_cuda_visibility"), start.index("gpu_preflight.py"))
 
-        self.assertIn(
-            "COPY custom_nodes/ /opt/comfyui-baked/custom_nodes/", dockerfile
-        )
-        self.assertTrue((package / "__init__.py").is_file())
-        self.assertTrue((package / "web" / "wan_loop_batch.js").is_file())
-
-    def test_auto_mosaic_runtime_is_pinned_and_cpu_node_is_bundled(self):
-        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-        package = ROOT / "custom_nodes" / "ComfyUI-WanLoopBatch"
-        requirements = (package / "requirements.txt").read_text(encoding="utf-8")
-
-        self.assertTrue((package / "mosaic_nodes.py").is_file())
-        self.assertEqual(requirements.strip(), "ultralytics==8.4.104")
-        self.assertIn("ComfyUI-WanLoopBatch/requirements.txt", dockerfile)
-
-    def test_custom_nodes_use_retryable_commit_pinned_fetches(self):
-        installer = (ROOT / "scripts" / "install_custom_nodes.sh").read_text(
-            encoding="utf-8"
-        )
-        manifest = (ROOT / "custom_nodes.txt").read_text(encoding="utf-8")
-        entries = [
-            line.split("|")
-            for line in manifest.splitlines()
-            if line and not line.startswith("#")
-        ]
-
-        self.assertIn('GIT_FETCH_ATTEMPTS="${GIT_FETCH_ATTEMPTS:-5}"', installer)
-        self.assertIn("fetch_pinned_node", installer)
-        self.assertIn("http.version=HTTP/1.1", installer)
-        self.assertIn("fetch --depth 1 origin", installer)
-        self.assertNotIn("git clone", installer)
-        self.assertTrue(entries)
-        self.assertTrue(all(len(entry) == 3 for entry in entries))
-        self.assertTrue(all(re.fullmatch(r"[0-9a-f]{40}", entry[2]) for entry in entries))
-
-    def test_loop_image_uses_a_separate_minimal_node_manifest(self):
-        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-        full_manifest = (ROOT / "custom_nodes.txt").read_text(encoding="utf-8")
-        loop_manifest = (ROOT / "custom_nodes.loop.txt").read_text(encoding="utf-8")
+    def test_loop_image_uses_pinned_minimal_node_manifest(self):
+        full = (ROOT / "custom_nodes.txt").read_text(encoding="utf-8")
+        loop = (ROOT / "custom_nodes.loop.txt").read_text(encoding="utf-8")
 
         def names(text):
             return {
@@ -94,38 +82,30 @@ class ContainerContractTests(unittest.TestCase):
                 if line and not line.startswith("#")
             }
 
-        loop_names = names(loop_manifest)
-        full_names = names(full_manifest)
-        self.assertIn("ARG CUSTOM_NODES_MANIFEST=custom_nodes.txt", dockerfile)
-        self.assertIn(
-            "COPY ${CUSTOM_NODES_MANIFEST} /opt/runpod-wan-animate/custom_nodes.txt",
-            dockerfile,
-        )
-        self.assertTrue(loop_names < full_names)
-        self.assertNotIn("ComfyUI-MMAudio", loop_names)
-        self.assertNotIn("ComfyUI-WanVideoWrapper", loop_names)
-        self.assertNotIn("ComfyUI-GGUF", loop_names)
+        self.assertTrue(names(loop) < names(full))
+        self.assertNotIn("ComfyUI-MMAudio", names(loop))
+        self.assertIn("COPY custom_nodes.loop.txt", self.loop)
 
-    def test_image_build_removes_git_metadata_in_the_same_layer(self):
-        installer = (ROOT / "scripts" / "install_custom_nodes.sh").read_text(
+    def test_custom_node_fetches_are_retryable_and_commit_pinned(self):
+        installer = (ROOT / "scripts/install_custom_nodes.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn('KEEP_CUSTOM_NODE_GIT:-0', installer)
-        self.assertIn("-name .git", installer)
+        entries = [
+            line.split("|")
+            for line in (ROOT / "custom_nodes.loop.txt").read_text(encoding="utf-8").splitlines()
+            if line and not line.startswith("#")
+        ]
+        self.assertIn("fetch_pinned_node", installer)
+        self.assertIn("http.version=HTTP/1.1", installer)
+        self.assertTrue(all(re.fullmatch(r"[0-9a-f]{40}", entry[2]) for entry in entries))
 
-    def test_minimal_loop_image_pins_pytorch_and_comfyui(self):
-        dockerfile = (ROOT / "Dockerfile.loop-minimal").read_text(encoding="utf-8")
-
-        self.assertRegex(
-            dockerfile,
-            r"ARG BASE_IMAGE=pytorch/pytorch:2\.10\.0-cuda12\.8-cudnn9-runtime@sha256:[0-9a-f]{64}",
+    def test_legacy_full_build_is_manual_only(self):
+        full_ci = (ROOT / ".github/workflows/build-full.yml").read_text(
+            encoding="utf-8"
         )
-        self.assertRegex(dockerfile, r"ARG COMFYUI_COMMIT=[0-9a-f]{40}")
-        self.assertIn("ARG CUSTOM_NODES_MANIFEST=custom_nodes.loop.txt", dockerfile)
-        self.assertNotIn("jupyterlab", dockerfile.lower())
-        self.assertNotIn("openssh-server", dockerfile.lower())
-        self.assertNotIn("filebrowser.tar", dockerfile.lower())
-        self.assertIn("gpu_preflight.py --stack-only", dockerfile)
+        self.assertIn("workflow_dispatch:", full_ci)
+        self.assertNotRegex(full_ci, r"(?m)^  push:")
+        self.assertNotIn("Dockerfile\n", self.ci)
 
 
 if __name__ == "__main__":

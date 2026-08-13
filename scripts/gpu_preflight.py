@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 
 
-MIN_BLACKWELL_DRIVER = (570, 26)
+MIN_CUDA13_DRIVER = (580, 0)
 
 
 TORCH_STACK_PROBE = r"""
@@ -94,8 +94,19 @@ def _version_tuple(value):
     return tuple(map(int, match.groups())) if match else None
 
 
-def _incompatible_blackwell_driver(gpu_summary):
-    """Return a diagnostic when an RTX 5090/Blackwell host driver is too old."""
+def _is_blackwell(name):
+    return bool(
+        re.search(r"RTX\s+50\d{2}", name, re.IGNORECASE)
+        or re.search(
+            r"\bBlackwell\b|\bB200\b|\bB300\b|\bGB200\b|RTX\s+PRO\s+\d+.*Blackwell",
+            name,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _incompatible_gpu_contract(gpu_summary):
+    """Return a non-retryable diagnostic for an image/GPU/driver mismatch."""
     try:
         rows = list(csv.reader(io.StringIO(gpu_summary)))
     except csv.Error:
@@ -106,22 +117,32 @@ def _incompatible_blackwell_driver(gpu_summary):
             continue
         name = row[0].strip()
         driver = row[3].strip()
-        is_blackwell = bool(
-            re.search(r"RTX\s+50\d{2}", name, re.IGNORECASE)
-            or re.search(r"\bBlackwell\b|\bB200\b|\bB300\b|\bGB200\b", name, re.IGNORECASE)
-        )
+        is_blackwell = _is_blackwell(name)
         parsed = _version_tuple(driver)
-        if is_blackwell and parsed and parsed < MIN_BLACKWELL_DRIVER:
-            minimum = ".".join(map(str, MIN_BLACKWELL_DRIVER))
+        family = os.environ.get("WAN_GPU_FAMILY", "").strip().lower()
+        expected_cuda = os.environ.get("EXPECTED_TORCH_CUDA", "").strip()
+
+        if family == "ada" and is_blackwell:
             return (
-                f"incompatible Blackwell driver: GPU={name} driver={driver}; "
-                f"CUDA 12.8 requires an NVIDIA R570 driver ({minimum}+) for this GPU"
+                f"wrong image for GPU: GPU={name}; this is the Ada/CUDA 12.8 "
+                "image. Deploy the loop-blackwell-cu130 image instead"
+            )
+        if family == "blackwell" and not is_blackwell:
+            return (
+                f"wrong image for GPU: GPU={name}; this is the Blackwell/CUDA "
+                "13.0 image. Deploy the loop-ada-cu128 image instead"
+            )
+        if expected_cuda.startswith("13.") and parsed and parsed < MIN_CUDA13_DRIVER:
+            minimum = ".".join(map(str, MIN_CUDA13_DRIVER))
+            return (
+                f"incompatible CUDA 13 driver: GPU={name} driver={driver}; "
+                f"this image requires NVIDIA driver {minimum}+"
             )
     return None
 
 
 def probe_torch_stack(python_bin, runner=subprocess.run):
-    """Verify that custom-node installs did not replace the pinned cu128 stack."""
+    """Verify custom-node installs did not replace the pinned CUDA stack."""
     try:
         result = runner(
             [python_bin, "-c", TORCH_STACK_PROBE],
@@ -163,9 +184,9 @@ def probe_once(python_bin, runner=subprocess.run):
         return ProbeResult(False, f"nvidia-smi failed: {_result_text(nvidia)}")
 
     gpu_summary = (nvidia.stdout or "").strip()
-    incompatible_driver = _incompatible_blackwell_driver(gpu_summary)
-    if incompatible_driver:
-        return ProbeResult(False, incompatible_driver, False)
+    incompatible_contract = _incompatible_gpu_contract(gpu_summary)
+    if incompatible_contract:
+        return ProbeResult(False, incompatible_contract, False)
 
     try:
         cuda = runner(
@@ -252,7 +273,7 @@ def main(argv=None):
         print(
             "[gpu-preflight] FATAL: incompatible PyTorch runtime.\n"
             "The image build or a custom-node dependency replaced the pinned "
-            "CUDA 12.8 wheel family. Do not download models with this image.\n"
+            "CUDA wheel family. Do not download models with this image.\n"
             f"{stack.diagnostic}",
             file=sys.stderr,
         )
@@ -271,6 +292,8 @@ def main(argv=None):
             "CUDA_VISIBLE_DEVICES",
             "NVIDIA_VISIBLE_DEVICES",
             "PIP_CONSTRAINT",
+            "WAN_GPU_FAMILY",
+            "EXPECTED_TORCH_CUDA",
         )
     }
     print(

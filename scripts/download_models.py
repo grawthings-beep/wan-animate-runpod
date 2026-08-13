@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 import zipfile
 from urllib.error import HTTPError
@@ -19,6 +20,33 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 USER_AGENT = "grawthings-wan22-runpod/3"
 DECIMAL_GB = 1_000_000_000
+
+
+def update_bootstrap_status(**updates):
+    """Best-effort progress update for the startup status page."""
+    raw_path = os.environ.get("BOOTSTRAP_STATUS_FILE", "").strip()
+    if not raw_path:
+        return
+    path = pathlib.Path(raw_path)
+    try:
+        current = {}
+        if path.is_file():
+            current = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(current, dict):
+                current = {}
+        current.update(updates)
+        current["updated_at"] = int(time.time())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.download.tmp")
+        temporary.write_text(
+            json.dumps(current, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    except (OSError, ValueError, TypeError):
+        # Progress reporting must never turn a valid model transfer into a
+        # failed Pod. The downloader's normal logs remain authoritative.
+        return
 
 
 def expand(value):
@@ -582,6 +610,16 @@ def main():
         if entry.get("enabled", True) and entry.get("group") in groups
     ]
     print(f"MODEL PROFILE: {profile} ({len(entries)} assets)")
+    total_bytes = sum(int(entry.get("size_bytes") or 0) for entry in entries)
+    update_bootstrap_status(
+        state="initializing",
+        phase="models",
+        message="モデルとLoRAを高速ダウンロードしています",
+        assets_completed=0,
+        assets_total=len(entries),
+        bytes_completed=0,
+        bytes_total=total_bytes,
+    )
 
     # Fail before downloading tens of gigabytes when a protected source cannot
     # be accessed. This is especially useful for the CivitAI-hosted T2V v4 pair.
@@ -630,12 +668,15 @@ def main():
         f"hf_xet={'off' if args.no_hf_xet else 'adaptive'}"
     )
     failures = []
+    completed_count = 0
+    completed_bytes = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as pool:
         futures = {pool.submit(provision, entry): entry for entry in ordered_entries}
         for future in concurrent.futures.as_completed(futures):
             entry = futures[future]
             try:
                 future.result()
+                completed_bytes += int(entry.get("size_bytes") or 0)
             except Exception as exc:
                 name = entry.get("name") or entry.get("path")
                 if entry.get("required", True):
@@ -643,6 +684,17 @@ def main():
                     print(f"ERROR required asset failed: {name}: {exc}", file=sys.stderr)
                 else:
                     print(f"WARN optional asset failed: {name}: {exc}", file=sys.stderr)
+            completed_count += 1
+            update_bootstrap_status(
+                state="initializing",
+                phase="models",
+                message="モデルとLoRAを高速ダウンロードしています",
+                detail=f"Last completed: {entry.get('name') or entry.get('path')}",
+                assets_completed=completed_count,
+                assets_total=len(entries),
+                bytes_completed=completed_bytes,
+                bytes_total=total_bytes,
+            )
 
     if failures:
         raise RuntimeError("required asset download failures:\n  - " + "\n  - ".join(failures))

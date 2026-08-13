@@ -72,11 +72,15 @@ class GpuPreflightTests(unittest.TestCase):
         )
         runner = mock.Mock(return_value=nvidia)
 
-        result = GPU_PREFLIGHT.probe_once("python", runner=runner)
+        with mock.patch.dict(
+            GPU_PREFLIGHT.os.environ,
+            {"EXPECTED_TORCH_CUDA": "13.0", "WAN_GPU_FAMILY": "blackwell"},
+        ):
+            result = GPU_PREFLIGHT.probe_once("python", runner=runner)
 
         self.assertFalse(result.ready)
         self.assertFalse(result.retryable)
-        self.assertIn("incompatible Blackwell driver", result.diagnostic)
+        self.assertIn("incompatible CUDA 13 driver", result.diagnostic)
         runner.assert_called_once()
 
     def test_current_5090_driver_reaches_real_cuda_probe(self):
@@ -97,6 +101,20 @@ class GpuPreflightTests(unittest.TestCase):
         self.assertTrue(result.ready)
         self.assertTrue(result.retryable)
         self.assertEqual(runner.call_count, 2)
+
+    def test_ada_image_rejects_blackwell_before_download(self):
+        nvidia = mock.Mock(
+            returncode=0,
+            stdout="NVIDIA GeForce RTX 5090, GPU-123, 32607 MiB, 590.48.01\n",
+            stderr="",
+        )
+        runner = mock.Mock(return_value=nvidia)
+        with mock.patch.dict(GPU_PREFLIGHT.os.environ, {"WAN_GPU_FAMILY": "ada"}):
+            result = GPU_PREFLIGHT.probe_once("python", runner=runner)
+        self.assertFalse(result.ready)
+        self.assertFalse(result.retryable)
+        self.assertIn("loop-blackwell-cu130", result.diagnostic)
+        runner.assert_called_once()
 
 
 if __name__ == "__main__":

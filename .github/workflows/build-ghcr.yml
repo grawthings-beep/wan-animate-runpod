@@ -1,4 +1,4 @@
-name: Build GHCR image
+name: Build production loop images
 
 on:
   push:
@@ -13,79 +13,73 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install lightweight test dependency
-        run: python -m pip install numpy==2.2.6
-
-      - name: Validate generated workflows and asset manifest
+      - name: Validate bundle
         run: |
+          python -m pip install numpy==2.2.6
           python scripts/prepare_workflows.py --check
           python scripts/validate_assets.py
           python -m compileall -q scripts tests custom_nodes
           python -m unittest discover -s tests -v
           node --check custom_nodes/ComfyUI-WanLoopBatch/web/wan_loop_batch.js
-          bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh
+          bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh scripts/container_smoke.sh
 
   build:
-    name: build (${{ matrix.profile }})
+    name: ${{ matrix.profile }}
     needs: validate
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      # GHCR intermittently rejects simultaneous login/layer uploads from
-      # matrix siblings. Cached variants take seconds; serial publication is
-      # more reliable and does not affect the resulting image pull speed.
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         include:
-          - profile: full
-            dockerfile: Dockerfile
-            node_manifest: custom_nodes.txt
+          - profile: loop-ada-cu128
+            base_image: runpod/comfyui:1.4.4-cuda12.8@sha256:7078f94dbe28d079c487c245dc3524443e2c6225a6208a1fff8c7a652c1b3a40
+            torch: 2.10.0+cu128
+            torchvision: 0.25.0+cu128
+            torchaudio: 2.10.0+cu128
+            cuda: "12.8"
+            gpu_family: ada
             image_tags: |
-              ghcr.io/${{ github.repository }}:latest
-              ghcr.io/${{ github.repository }}:cuda12.8
-              ghcr.io/${{ github.repository }}:wan22-smooth-v6
-              ghcr.io/${{ github.repository }}:wan22-lightning-longvideo
-              ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
-          - profile: loop-minimal
-            dockerfile: Dockerfile.loop-minimal
-            node_manifest: custom_nodes.loop.txt
+              ghcr.io/${{ github.repository }}:loop-ada-cu128
+              ghcr.io/${{ github.repository }}:loop-ada-cu128-sha-${{ github.sha }}
+          - profile: loop-blackwell-cu130
+            base_image: runpod/comfyui:1.4.4-cuda13.0@sha256:949b0688db0692b97b9aab9efd1c8f5afe94cfaa32c32008f31bcafcff63baf1
+            torch: 2.10.0+cu130
+            torchvision: 0.25.0+cu130
+            torchaudio: 2.10.0+cu130
+            cuda: "13.0"
+            gpu_family: blackwell
             image_tags: |
-              ghcr.io/${{ github.repository }}:wan22-loop-minimal
-              ghcr.io/${{ github.repository }}:minimal-sha-${{ github.sha }}
+              ghcr.io/${{ github.repository }}:loop-blackwell-cu130
+              ghcr.io/${{ github.repository }}:loop-blackwell-cu130-sha-${{ github.sha }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
+      - name: Build, smoke-test, and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: Dockerfile.loop
           platforms: linux/amd64
           push: true
-          cache-from: type=gha,scope=${{ matrix.profile }}
-          # An export outage must not turn a correctly published image red.
-          cache-to: type=gha,mode=min,ignore-error=true,scope=${{ matrix.profile }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.profile }}
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.profile }},mode=max,image-manifest=true,oci-mediatypes=true
           build-args: |
-            BUNDLE_REVISION=${{ github.sha }}
-            CUSTOM_NODES_MANIFEST=${{ matrix.node_manifest }}
+            BASE_IMAGE=${{ matrix.base_image }}
+            EXPECTED_TORCH_VERSION=${{ matrix.torch }}
+            EXPECTED_TORCHVISION_VERSION=${{ matrix.torchvision }}
+            EXPECTED_TORCHAUDIO_VERSION=${{ matrix.torchaudio }}
+            EXPECTED_TORCH_CUDA=${{ matrix.cuda }}
+            WAN_GPU_FAMILY=${{ matrix.gpu_family }}
             IMAGE_PROFILE=${{ matrix.profile }}
+            BUNDLE_REVISION=${{ github.sha }}
           tags: ${{ matrix.image_tags }}

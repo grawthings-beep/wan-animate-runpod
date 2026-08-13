@@ -15,6 +15,16 @@ MOSAIC_WORKFLOWS = (
     / "workflows"
     / "wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod.json",
 )
+CORE_WORKFLOWS = (
+    ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_core_runpod.json",
+    ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_batch10_core_runpod.json",
+    ROOT
+    / "workflows"
+    / "wan22_smooth_v6_seamless_loop_core_auto_mosaic_runpod.json",
+    ROOT
+    / "workflows"
+    / "wan22_smooth_v6_seamless_loop_batch10_core_auto_mosaic_runpod.json",
+)
 LIGHTNING = (
     ROOT / "workflows" / "wan22_native_enhanced_lightning_longvideo_runpod.json"
 )
@@ -73,7 +83,7 @@ class WorkflowWiringTests(unittest.TestCase):
                     self.assertEqual(negative[1:3], nag_negative[1:3])
 
     def test_every_top_level_link_matches_its_declared_slots(self):
-        for path in (*WORKFLOWS, *MOSAIC_WORKFLOWS, LIGHTNING):
+        for path in (*WORKFLOWS, *MOSAIC_WORKFLOWS, *CORE_WORKFLOWS, LIGHTNING):
             with self.subTest(path=path.name):
                 graph = self.load(path)
                 links = {link[0]: link for link in graph["links"]}
@@ -212,7 +222,7 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertTrue(all(item["on"] is False for item in iroiro_low))
 
     def test_loop_workflow_uses_requested_resolution(self):
-        for path in WORKFLOWS[1:]:
+        for path in (*WORKFLOWS[1:], *CORE_WORKFLOWS):
             with self.subTest(path=path.name):
                 graph = self.load(path)
                 node = next(node for node in graph["nodes"] if node["id"] == 328)
@@ -408,7 +418,24 @@ class WorkflowWiringTests(unittest.TestCase):
                     ],
                 )
                 self.assertEqual(
-                    graph["extra"]["runpod_bundle"]["profile"], "loop-quality"
+                    graph["extra"]["runpod_bundle"]["profile"], "loop-all"
+                )
+
+    def test_core_variants_only_reference_enabled_loras(self):
+        for path in CORE_WORKFLOWS:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                entries = [
+                    item
+                    for node in graph["nodes"]
+                    if node["type"] == "Power Lora Loader (rgthree)"
+                    for item in node["widgets_values"]
+                    if isinstance(item, dict) and item.get("lora")
+                ]
+                self.assertEqual(len(entries), 6)
+                self.assertTrue(all(item["on"] is True for item in entries))
+                self.assertEqual(
+                    graph["extra"]["runpod_bundle"]["profile"], "loop-core"
                 )
 
     def test_batch10_mosaic_still_finalizes_the_encoded_files(self):

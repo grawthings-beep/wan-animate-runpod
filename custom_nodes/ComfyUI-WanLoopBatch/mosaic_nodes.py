@@ -51,7 +51,8 @@ def _load_model(model_name: str):
     if not model_path.is_file():
         raise FileNotFoundError(
             f"Auto-mosaic segmentation model is missing: {model_path}. "
-            "Redeploy with DOWNLOAD_MODELS=1, MODEL_PROFILE=loop-quality, "
+            "Redeploy with DOWNLOAD_MODELS=1 and MODEL_PROFILE=loop-core "
+            "(or loop-all), "
             "and CIVITAI_API_TOKEN configured."
         )
 

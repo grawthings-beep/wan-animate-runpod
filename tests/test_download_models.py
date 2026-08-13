@@ -183,7 +183,7 @@ class DownloadModelsTests(unittest.TestCase):
         manifest = json.loads(
             (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
         )
-        groups = DOWNLOAD_MODELS.selected_groups(manifest, "loop-quality")
+        groups = DOWNLOAD_MODELS.selected_groups(manifest, "loop-all")
         self.assertEqual(
             groups,
             {
@@ -419,7 +419,29 @@ class DownloadModelsTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            workflow["extra"]["runpod_bundle"]["profile"], "loop-quality"
+            workflow["extra"]["runpod_bundle"]["profile"], "loop-all"
+        )
+
+    def test_loop_core_omits_disabled_optional_lora_groups(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        groups = DOWNLOAD_MODELS.selected_groups(manifest, "loop-core")
+        self.assertEqual(
+            groups,
+            {
+                "text-common",
+                "clip-vision",
+                "vae-fp32",
+                "i2v",
+                "lightx-i2v",
+                "loop-nsfw-loras",
+                "loop-xxx-loras",
+                "rife49",
+                "auto-mosaic",
+            },
         )
 
     def test_auto_mosaic_segmentation_archive_is_pinned_and_verified(self):
