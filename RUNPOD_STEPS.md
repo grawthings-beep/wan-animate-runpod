@@ -115,8 +115,20 @@ Edgeだけ403になりChromeでは開く場合、RunPod proxy自体ではなくE
 名前に`batch10`が付くworkflowを開き、`BULK DROP + QUEUE 10 LOOPS` nodeを使います。
 
 1. `01.png`〜`10.png`を入れたフォルダを一括投入欄へdropします。10枚入りZIPでも構いません。
-2. 対応するpositive promptを1行ずつ書いた`prompts.txt`を同じ欄へdropします。
+2. 対応するpositive promptを空行で10ブロックに区切った`prompts.txt`を同じ欄へdropします。各promptブロック内は複数行で構いません。
 3. `準備完了: 画像10枚 + prompt 10件`を確認します。
 4. `QUEUE 10 LOOPS (SEQUENTIAL)`を1回だけ押します。
 
 フォルダ名やOSの列挙順ではなく、相対ファイル名の自然順で対応付けます。たとえば`2.png`は`10.png`より前です。ZIP内に`prompts.txt`も入れた場合は、ZIP 1個をdropするだけで1〜3が完了します。画像またはpromptが10件ちょうどでなければqueueされません。
+
+`prompts.txt`の例:
+
+```text
+subject one performs a continuous cyclic motion,
+medium shot, fixed camera, stable background
+
+subject two turns slowly and returns to the starting pose,
+full body shot, smooth periodic motion
+
+（同じ形式で合計10ブロック）
+```

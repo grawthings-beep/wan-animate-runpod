@@ -352,6 +352,7 @@ class WorkflowWiringTests(unittest.TestCase):
                 note = next(node for node in graph["nodes"] if node["id"] == 323)
                 self.assertIn("exactly 10 images", note["widgets_values"])
                 self.assertIn("prompts.txt", note["widgets_values"])
+                self.assertIn("empty line between", note["widgets_values"])
 
     def test_batch10_reuses_one_selected_image_at_both_loop_ends(self):
         graph = self.load(WORKFLOWS[2])

@@ -63,12 +63,16 @@ class ContainerContractTests(unittest.TestCase):
         frontend = (package / "web" / "wan_loop_batch.js").read_text(
             encoding="utf-8"
         )
+        parser = (package / "web" / "wan_loop_prompt_parser.mjs").read_text(
+            encoding="utf-8"
+        )
         routes = (package / "batch_routes.py").read_text(encoding="utf-8")
         self.assertIn("webkitGetAsEntry", frontend)
-        self.assertIn("exactly 10 prompts", frontend)
+        self.assertIn("exactly 10 prompts", parser)
         self.assertIn("/wan-loop/batch/import-zip", frontend)
         self.assertIn("/wan-loop/batch/import-zip", routes)
         self.assertIn("extract_image_zip", routes)
+        self.assertIn("blank-line-separated prompt blocks", parser)
 
     def test_database_and_boot_status_use_writable_workspace(self):
         start = (ROOT / "scripts/start.sh").read_text(encoding="utf-8")

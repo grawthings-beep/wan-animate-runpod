@@ -25,6 +25,8 @@ jobs:
           python -m compileall -q scripts tests custom_nodes
           python -m unittest discover -s tests -v
           node --check custom_nodes/ComfyUI-WanLoopBatch/web/wan_loop_batch.js
+          node --check custom_nodes/ComfyUI-WanLoopBatch/web/wan_loop_prompt_parser.mjs
+          node tests/test_prompt_parser.mjs
           bash -n scripts/common.sh scripts/install_custom_nodes.sh scripts/start.sh scripts/container_smoke.sh
 
   build:

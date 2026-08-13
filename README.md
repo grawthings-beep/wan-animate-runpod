@@ -36,7 +36,7 @@ Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ�
 
 batch10は10本を同時にGPUへ載せません。専用の一括投入欄へ10枚入りフォルダ（またはZIP）と`prompts.txt`をdropすると、自然なファイル名順で10slotを自動設定します。専用ボタンを1回押すと独立した10 jobを順番にqueueし、10本目の完了後だけZIPを自動downloadします。
 
-`prompts.txt`は空行を除いて1行につき1 prompt、合計10行です。画像は`01.png`〜`10.png`のように命名してください。JSON文字列10件の配列、または`---`で区切った10個の複数行promptにも対応します。ZIP内に`prompts.txt`を含めればZIP 1個のdropだけで設定完了です。
+`prompts.txt`は1件のpromptを何行でも書けます。次の画像用promptとの間に空行を1行以上入れ、合計10ブロックにしてください。画像は`01.png`〜`10.png`のように命名します。旧形式の1行×10件、JSON文字列10件の配列、`---`区切りにも対応します。ZIP内に`prompts.txt`を含めればZIP 1個のdropだけで設定完了です。
 
 auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後・MP4 encode前で輪郭に沿ったモザイクを入れます。WANとVRAMを奪い合いません。
 

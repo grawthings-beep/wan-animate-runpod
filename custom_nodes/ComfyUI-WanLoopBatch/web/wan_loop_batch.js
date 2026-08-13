@@ -1,5 +1,6 @@
 import { app } from "/scripts/app.js";
 import { api } from "/scripts/api.js";
+import { parsePromptsText } from "./wan_loop_prompt_parser.mjs";
 
 const SLOT_COUNT = 10;
 const IMAGE_PATTERN = /\.(png|jpe?g|webp|bmp|gif)$/i;
@@ -142,36 +143,6 @@ async function importZip(file, setStatus) {
   };
 }
 
-function parsePromptsText(rawText, filename = "prompts.txt") {
-  const text = String(rawText).replace(/^\uFEFF/, "").trim();
-  if (!text) throw new Error(`${filename} is empty`);
-
-  let prompts;
-  if (/^\[/.test(text)) {
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (error) {
-      throw new Error(`${filename} contains invalid JSON: ${error.message}`);
-    }
-    if (!Array.isArray(parsed)) throw new Error(`${filename} JSON must be an array`);
-    prompts = parsed.map((item) => String(item).trim());
-  } else if (/^\s*---+\s*$/m.test(text)) {
-    prompts = text.split(/^\s*---+\s*$/m).map((item) => item.trim()).filter(Boolean);
-  } else {
-    prompts = text.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
-    if (prompts.length === SLOT_COUNT && prompts.every((item) => /^\d{1,2}[.):]\s+/.test(item))) {
-      prompts = prompts.map((item) => item.replace(/^\d{1,2}[.):]\s+/, ""));
-    }
-  }
-
-  if (prompts.length !== SLOT_COUNT) {
-    throw new Error(`${filename} must contain exactly 10 prompts; found ${prompts.length}`);
-  }
-  if (prompts.some((item) => !item)) throw new Error(`${filename} contains an empty prompt`);
-  return prompts;
-}
-
 function assignImages(selector, images) {
   if (images.length !== SLOT_COUNT) throw new Error("image import did not return 10 items");
   const nodes = slotNodesOrThrow(selector);
@@ -301,7 +272,7 @@ function makeBatchDropWidget(selector) {
   ].join(";");
   root.innerHTML = `
     <strong style="font-size:14px">一括投入：画像フォルダ/ZIP + prompts.txt</strong>
-    <div>ここへfolder、ZIP、またはprompt fileをdrop</div>
+    <div>ここへfolder、ZIP、またはprompt fileをdrop（prompt同士は空行で区切る）</div>
     <div data-status style="min-height:34px;color:#aebcff">画像 0/10 ・ prompt 0/10</div>
     <div data-buttons style="display:flex;gap:6px;flex-wrap:wrap"></div>
   `;
