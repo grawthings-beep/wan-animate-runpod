@@ -577,7 +577,7 @@ def _loop_selector_node(node_id, position, order):
         "id": node_id,
         "type": "WanLoopQueueSelector",
         "pos": list(position),
-        "size": [520, 500],
+        "size": [600, 720],
         "flags": {},
         "order": order,
         "mode": 0,
@@ -594,7 +594,7 @@ def _loop_selector_node(node_id, position, order):
         ],
         "properties": {"Node name for S&R": "WanLoopQueueSelector"},
         "widgets_values": [1, "increment", "click-queue-10-button"],
-        "title": "QUEUE 10 LOOPS — ONE JOB AT A TIME",
+        "title": "BULK DROP + QUEUE 10 LOOPS — ONE JOB AT A TIME",
     }
 
 
@@ -707,8 +707,8 @@ def patch_loop_batch10(loop):
             },
             {
                 "id": 54,
-                "title": "SEQUENTIAL QUEUE CONTROL",
-                "bounding": [-4070, 2920, 620, 620],
+                "title": "BULK DROP + SEQUENTIAL QUEUE CONTROL",
+                "bounding": [-4070, 2920, 700, 850],
                 "color": "#5b4ca3",
                 "flags": {},
             },
@@ -725,10 +725,15 @@ def patch_loop_batch10(loop):
     by_id = {node["id"]: node for node in graph["nodes"]}
     by_id[323]["widgets_values"] = (
         "10-LOOP SEQUENTIAL QUEUE\n\n"
-        "1. Select one image and enter its matching positive prompt in every "
-        "slot from 01 to 10.\n2. Press QUEUE 10 LOOPS (SEQUENTIAL) once.\n"
-        "3. ComfyUI creates ten separate jobs. Only one loop occupies VRAM at "
-        "a time.\n4. After job 10 succeeds, the browser downloads one ZIP with "
+        "1. Drop a folder containing exactly 10 images onto the BULK DROP "
+        "panel. A ZIP containing exactly 10 images is also accepted. Images "
+        "are assigned by natural filename order (01, 02, ..., 10).\n"
+        "2. Drop prompts.txt onto the same panel. Put one positive prompt on "
+        "each of exactly 10 non-empty lines, in image order. JSON arrays and "
+        "10 multiline blocks separated by --- are also accepted.\n"
+        "3. Confirm READY, then press QUEUE 10 LOOPS (SEQUENTIAL) once.\n"
+        "4. ComfyUI creates ten separate jobs. Only one loop occupies VRAM at "
+        "a time.\n5. After job 10 succeeds, the browser downloads one ZIP with "
         "slot-01.mp4 through slot-10.mp4 plus manifest.json.\n\n"
         "Do not use the normal Queue button for this preset. A failed earlier "
         "job intentionally prevents an incomplete ZIP from downloading."

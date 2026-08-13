@@ -74,7 +74,7 @@ MODEL_DISK_HEADROOM_GB=12
 YOLO_CONFIG_DIR=/workspace/.cache/ultralytics
 YOLO_AUTOINSTALL=false
 YOLO_OFFLINE=true
-COMFYUI_ARGS=--reserve-vram 3
+COMFYUI_ARGS=--reserve-vram 3 --max-upload-size 300
 CIVITAI_API_TOKEN={{ RUNPOD_SECRET_CIVITAI_TOKEN }}
 HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
 ```
@@ -109,3 +109,14 @@ BOOT PHASE: comfyui-exec
 4090 imageを5090で使った場合、または逆の場合は`wrong image for GPU`でdownload前に止まります。5090 hostのdriverが580未満なら`incompatible CUDA 13 driver`です。この場合はStop/StartではなくPodをTerminateし、正しいimageで新規Deployしてください。
 
 Edgeだけ403になりChromeでは開く場合、RunPod proxy自体ではなくEdge側に残ったRunPod認証cookie・追跡防止・拡張機能が原因です。InPrivateで開く、`runpod.net`のsite dataを削除、追跡防止をBalancedへ変更の順で確認します。
+
+## Batch10の一括投入
+
+名前に`batch10`が付くworkflowを開き、`BULK DROP + QUEUE 10 LOOPS` nodeを使います。
+
+1. `01.png`〜`10.png`を入れたフォルダを一括投入欄へdropします。10枚入りZIPでも構いません。
+2. 対応するpositive promptを1行ずつ書いた`prompts.txt`を同じ欄へdropします。
+3. `準備完了: 画像10枚 + prompt 10件`を確認します。
+4. `QUEUE 10 LOOPS (SEQUENTIAL)`を1回だけ押します。
+
+フォルダ名やOSの列挙順ではなく、相対ファイル名の自然順で対応付けます。たとえば`2.png`は`10.png`より前です。ZIP内に`prompts.txt`も入れた場合は、ZIP 1個をdropするだけで1〜3が完了します。画像またはpromptが10件ちょうどでなければqueueされません。

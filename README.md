@@ -34,7 +34,9 @@ Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ�
 - 上記4本の全LoRA版（ファイル名に`core`なし）
 - AIOとNative Enhanced Lightningは互換用。通常のpushではlegacy full imageを作らず、手動Actionだけで作ります。
 
-batch10は10本を同時にGPUへ載せません。各画像とpositive promptを10slotへ入れて専用ボタンを1回押すと、独立した10 jobを順番にqueueし、10本目の完了後だけZIPを自動downloadします。
+batch10は10本を同時にGPUへ載せません。専用の一括投入欄へ10枚入りフォルダ（またはZIP）と`prompts.txt`をdropすると、自然なファイル名順で10slotを自動設定します。専用ボタンを1回押すと独立した10 jobを順番にqueueし、10本目の完了後だけZIPを自動downloadします。
+
+`prompts.txt`は空行を除いて1行につき1 prompt、合計10行です。画像は`01.png`〜`10.png`のように命名してください。JSON文字列10件の配列、または`---`で区切った10個の複数行promptにも対応します。ZIP内に`prompts.txt`を含めればZIP 1個のdropだけで設定完了です。
 
 auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後・MP4 encode前で輪郭に沿ったモザイクを入れます。WANとVRAMを奪い合いません。
 

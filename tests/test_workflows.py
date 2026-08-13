@@ -332,6 +332,27 @@ class WorkflowWiringTests(unittest.TestCase):
         )
         self.assertEqual(graph["extra"]["runpod_bundle"]["queue_jobs"], 10)
 
+    def test_every_batch10_variant_exposes_bulk_drop_selector(self):
+        batch_paths = (
+            WORKFLOWS[2],
+            CORE_WORKFLOWS[1],
+            MOSAIC_WORKFLOWS[1],
+            CORE_WORKFLOWS[3],
+        )
+        for path in batch_paths:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                selector = next(
+                    node
+                    for node in graph["nodes"]
+                    if node["type"] == "WanLoopQueueSelector"
+                )
+                self.assertEqual(selector["size"], [600, 720])
+                self.assertIn("BULK DROP", selector["title"])
+                note = next(node for node in graph["nodes"] if node["id"] == 323)
+                self.assertIn("exactly 10 images", note["widgets_values"])
+                self.assertIn("prompts.txt", note["widgets_values"])
+
     def test_batch10_reuses_one_selected_image_at_both_loop_ends(self):
         graph = self.load(WORKFLOWS[2])
         by_id = {node["id"]: node for node in graph["nodes"]}

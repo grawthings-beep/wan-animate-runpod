@@ -340,7 +340,7 @@ if [[ -n "${BOOTSTRAP_STATUS_PID}" ]]; then
   BOOTSTRAP_STATUS_PID=""
 fi
 
-read -r -a EXTRA_ARGS <<< "${COMFYUI_ARGS:---reserve-vram 3}"
+read -r -a EXTRA_ARGS <<< "${COMFYUI_ARGS:---reserve-vram 3 --max-upload-size 300}"
 CORS_ARGS=()
 if [[ -n "${COMFYUI_CORS_ORIGIN:-}" ]]; then
   CORS_ARGS=(--enable-cors-header "${COMFYUI_CORS_ORIGIN}")

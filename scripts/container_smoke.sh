@@ -36,7 +36,7 @@ env \
   MODEL_ROOT="${SMOKE_ROOT}/workspace" \
   CONFIG_DIR="${SMOKE_ROOT}/config" \
   MODEL_PROFILE=loop-core \
-  COMFYUI_ARGS="--cpu --quick-test-for-ci" \
+  COMFYUI_ARGS="--cpu --quick-test-for-ci --max-upload-size 300" \
   /opt/runpod-wan-animate/scripts/start.sh
 
 test -d "${SMOKE_ROOT}/workspace/user/default/workflows"

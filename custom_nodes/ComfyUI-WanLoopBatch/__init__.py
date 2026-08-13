@@ -6,6 +6,7 @@ from .mosaic_nodes import (
     NODE_CLASS_MAPPINGS as MOSAIC_NODE_CLASS_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS as MOSAIC_NODE_DISPLAY_NAME_MAPPINGS,
 )
+from . import batch_routes as _batch_routes  # noqa: F401
 
 
 NODE_CLASS_MAPPINGS = {

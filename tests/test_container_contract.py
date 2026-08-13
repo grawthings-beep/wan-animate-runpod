@@ -54,8 +54,21 @@ class ContainerContractTests(unittest.TestCase):
         smoke = (ROOT / "scripts/container_smoke.sh").read_text(encoding="utf-8")
         self.assertIn("/opt/runpod-wan-animate/scripts/start.sh", smoke)
         self.assertIn("--quick-test-for-ci", smoke)
+        self.assertIn("--max-upload-size 300", smoke)
         self.assertIn("BOOTSTRAP_STATUS=0", smoke)
         self.assertIn("container_smoke.sh", self.loop)
+
+    def test_batch_bulk_import_frontend_and_zip_route_are_bundled(self):
+        package = ROOT / "custom_nodes" / "ComfyUI-WanLoopBatch"
+        frontend = (package / "web" / "wan_loop_batch.js").read_text(
+            encoding="utf-8"
+        )
+        routes = (package / "batch_routes.py").read_text(encoding="utf-8")
+        self.assertIn("webkitGetAsEntry", frontend)
+        self.assertIn("exactly 10 prompts", frontend)
+        self.assertIn("/wan-loop/batch/import-zip", frontend)
+        self.assertIn("/wan-loop/batch/import-zip", routes)
+        self.assertIn("extract_image_zip", routes)
 
     def test_database_and_boot_status_use_writable_workspace(self):
         start = (ROOT / "scripts/start.sh").read_text(encoding="utf-8")
