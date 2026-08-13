@@ -13,8 +13,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Validate bundle
@@ -57,7 +57,7 @@ jobs:
               ghcr.io/${{ github.repository }}:loop-blackwell-cu130
               ghcr.io/${{ github.repository }}:loop-blackwell-cu130-sha-${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
