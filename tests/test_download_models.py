@@ -196,6 +196,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "loop-xxx-loras",
                 "loop-cumshot-loras",
                 "loop-joi-loras",
+                "loop-throat-loras",
                 "loop-iroiro-high-loras",
                 "loop-iroiro-low-loras",
                 "rife49",
@@ -207,7 +208,7 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 26)
+        self.assertEqual(len(selected), 28)
         self.assertIn("animeNSFWDetection_v50.zip", selected)
         self.assertIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
@@ -236,6 +237,12 @@ class DownloadModelsTests(unittest.TestCase):
             {
                 "I2V_joi_trend_high.safetensors",
                 "I2V_joi_trend_low.safetensors",
+            }.issubset(selected)
+        )
+        self.assertTrue(
+            {
+                "Wan22_ThroatV3_High.safetensors",
+                "Wan22_ThroatV3_Low.safetensors",
             }.issubset(selected)
         )
         self.assertTrue(
@@ -375,6 +382,44 @@ class DownloadModelsTests(unittest.TestCase):
         )
         self.assertTrue(all(entry["url"].startswith(pinned_prefix) for entry in entries))
         self.assertTrue(all("requires_env" not in entry for entry in entries))
+
+    def test_loop_throat_loras_are_verified_civitai_downloads(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        entries = [
+            entry
+            for entry in manifest["models"]
+            if entry["group"] == "loop-throat-loras"
+        ]
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(
+            {entry["size_bytes"] for entry in entries},
+            {306831680, 306831672},
+        )
+        self.assertEqual(
+            {entry["sha256"] for entry in entries},
+            {
+                "05331437178430556a859b3c136ca35be5f08327848cfa66e0e983b1bc0f4ebb",
+                "17f7290bed73020bf9d5aaa8abb9ee4024606184dc2ab963047b927406d8ad9a",
+            },
+        )
+        self.assertEqual(
+            {entry["url"] for entry in entries},
+            {
+                "https://civitai.red/api/download/models/2517513?fileId=2405261",
+                "https://civitai.red/api/download/models/2517548?fileId=2405303",
+            },
+        )
+        self.assertTrue(
+            all(
+                entry.get("requires_env") == ["CIVITAI_API_TOKEN"]
+                and entry.get("auth_query_env") == "CIVITAI_API_TOKEN"
+                for entry in entries
+            )
+        )
 
     def test_loop_iroiro_low_loras_are_verified_revision_pinned_downloads(self):
         import json

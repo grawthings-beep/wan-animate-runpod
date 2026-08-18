@@ -388,6 +388,7 @@ def patch_loop(aio):
             lora("SmoothXXXAnimation_High.safetensors", 1.5, True),
             lora("Cumshot_Aesthetics_High.safetensors", 1.0),
             lora("I2V_joi_trend_high.safetensors", 1.0),
+            lora("Wan22_ThroatV3_High.safetensors", 1.0),
             lora(
                 "cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors",
                 1.0,
@@ -416,6 +417,7 @@ def patch_loop(aio):
             lora("SmoothXXXAnimation_Low.safetensors", 1.0, True),
             lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
             lora("I2V_joi_trend_low.safetensors", 1.0),
+            lora("Wan22_ThroatV3_Low.safetensors", 1.0),
             lora("cheek_bulge_fellatio_wanvideo_i2v.safetensors", 1.0),
             lora("glans_licking_wanvideo_i2v_epoch5.safetensors", 1.0),
             lora("head_back_wanvideo_i2v_epoch5.safetensors", 1.0),
@@ -429,11 +431,11 @@ def patch_loop(aio):
 
     # The optional High/Low pairs make both loaders taller. Lift the
     # loaders into their group so they do not cover the prompt box.
-    by_id[325]["pos"][1] = 2365
-    by_id[324]["pos"][1] = 2365
+    by_id[325]["pos"][1] = 2295
+    by_id[324]["pos"][1] = 2295
     lora_group = next(group for group in graph["groups"] if group["id"] == 45)
-    lora_group["bounding"][1] = 2325
-    lora_group["bounding"][3] = 740
+    lora_group["bounding"][1] = 2255
+    lora_group["bounding"][3] = 810
 
     resolution = by_id[328]
     resolution["properties"]["valueX"] = 528
@@ -452,8 +454,8 @@ def patch_loop(aio):
         "audio track cannot introduce a seam.\n\n"
         "Core LoRAs are ON: LightX2V 3.0 High / 1.5 Low, NSFW-22 2.75 High / "
         "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Anime Cumshot "
-        "Aesthetics and JOI Handjob Trend High/Low pairs are available at 1.0 "
-        "but OFF by default. Cumshot Aesthetics targets the official WAN base "
+        "Aesthetics, JOI Handjob Trend, and Deepthroat/Face Fuck v3 High/Low "
+        "pairs are available at 1.0 but OFF by default. Cumshot Aesthetics targets the official WAN base "
         "and may be unstable with an AIO/merged model. The JOI pair is native "
         "WAN 2.2 I2V-A14B. Five iroiroLoRA High/Low effect pairs are also "
         "available at 1.0 and OFF by default; enable one matching pair at a "
@@ -488,7 +490,7 @@ def patch_loop_core(loop):
         note["widgets_values"] = (
             "LOOP CORE PRESET\n\n"
             "Only the enabled LightX2V, NSFW-22, and SmoothXXXAnimation "
-            "High/Low pairs are present. This avoids downloading 5.17 GB of "
+            "High/Low pairs are present. This avoids downloading 5.78 GB of "
             "disabled optional LoRAs and prevents false missing-model notices. "
             "Use the non-core workflow with MODEL_PROFILE=loop-all when those "
             "optional effects are needed.\n\n"

@@ -100,7 +100,7 @@ cuda-preflight -> workflows -> models -> validation -> ready -> ComfyUI
 ```text
 [gpu-preflight] TORCH STACK READY
 [gpu-preflight] READY
-MODEL PROFILE: loop-all (26 assets)
+MODEL PROFILE: loop-all (28 assets)
 TRANSFER ENGINE: 4 files in parallel
 [check_env] ... required_missing=0
 BOOT PHASE: comfyui-exec

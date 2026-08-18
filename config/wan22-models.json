@@ -4,7 +4,7 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "auto-mosaic", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "auto-mosaic", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
@@ -15,12 +15,12 @@
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49", "auto-mosaic"]
     },
     "loop-all": {
-      "description": "Complete seamless-loop pack. Adds Cumshot Aesthetics, JOI Handjob Trend, and all five iroiroLoRA High/Low pairs to loop-core for optional manual use.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
+      "description": "Complete seamless-loop pack. Adds Cumshot Aesthetics, JOI Handjob Trend, Deepthroat/Face Fuck v3, and all five iroiroLoRA High/Low pairs to loop-core for optional manual use.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
     },
     "loop-quality": {
       "description": "Deprecated compatibility alias for loop-all. New templates should use loop-core or loop-all.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -285,6 +285,28 @@
       "path": "models/loras/I2V_joi_trend_low.safetensors",
       "size_bytes": 613516752,
       "sha256": "71a1e1992b1092feef51d083309c4dd72c8fcc25cf007d9d818b9b3ce62c363c",
+      "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
+      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+    },
+    {
+      "name": "WAN 2.2 I2V Deepthroat Face Fuck v3 High LoRA",
+      "group": "loop-throat-loras",
+      "url": "https://civitai.red/api/download/models/2517513?fileId=2405261",
+      "path": "models/loras/Wan22_ThroatV3_High.safetensors",
+      "size_bytes": 306831680,
+      "sha256": "05331437178430556a859b3c136ca35be5f08327848cfa66e0e983b1bc0f4ebb",
+      "requires_env": ["CIVITAI_API_TOKEN"],
+      "auth_query_env": "CIVITAI_API_TOKEN",
+      "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+    },
+    {
+      "name": "WAN 2.2 I2V Deepthroat Face Fuck v3 Low LoRA",
+      "group": "loop-throat-loras",
+      "url": "https://civitai.red/api/download/models/2517548?fileId=2405303",
+      "path": "models/loras/Wan22_ThroatV3_Low.safetensors",
+      "size_bytes": 306831672,
+      "sha256": "17f7290bed73020bf9d5aaa8abb9ee4024606184dc2ab963047b927406d8ad9a",
       "requires_env": ["CIVITAI_API_TOKEN"],
       "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}

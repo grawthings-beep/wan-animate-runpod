@@ -120,7 +120,7 @@ class WorkflowWiringTests(unittest.TestCase):
             for item in node["widgets_values"]
             if isinstance(item, dict) and item.get("lora")
         ]
-        self.assertEqual(len(entries), 20)
+        self.assertEqual(len(entries), 22)
         self.assertEqual(
             {item["lora"] for item in entries},
             {
@@ -133,6 +133,8 @@ class WorkflowWiringTests(unittest.TestCase):
                 "Cumshot_Aesthetics_Low.safetensors",
                 "I2V_joi_trend_high.safetensors",
                 "I2V_joi_trend_low.safetensors",
+                "Wan22_ThroatV3_High.safetensors",
+                "Wan22_ThroatV3_Low.safetensors",
                 "cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors",
                 "glans_licking_high_wan-2-2_i2v_A14B.safetensors",
                 "head_back_high_wan-2-2_i2v_A14B.safetensors",
@@ -197,6 +199,17 @@ class WorkflowWiringTests(unittest.TestCase):
             },
         )
         self.assertTrue(all(item["on"] is False for item in joi))
+        throat = [
+            item for item in entries if item["lora"].startswith("Wan22_ThroatV3_")
+        ]
+        self.assertEqual(
+            {item["lora"]: item["strength"] for item in throat},
+            {
+                "Wan22_ThroatV3_High.safetensors": 1.0,
+                "Wan22_ThroatV3_Low.safetensors": 1.0,
+            },
+        )
+        self.assertTrue(all(item["on"] is False for item in throat))
         iroiro = [
             item
             for item in entries
@@ -265,6 +278,30 @@ class WorkflowWiringTests(unittest.TestCase):
                     and item.get("lora", "").startswith("I2V_joi_trend_")
                 }
                 self.assertEqual(entries, expected)
+
+    def test_all_non_core_loop_variants_inherit_optional_throat_lora_pair(self):
+        for path in (*WORKFLOWS[1:], *MOSAIC_WORKFLOWS):
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                by_id = {node["id"]: node for node in graph["nodes"]}
+                high = {
+                    item["lora"]: (item["strength"], item["on"])
+                    for item in by_id[325]["widgets_values"]
+                    if isinstance(item, dict)
+                    and item.get("lora", "").startswith("Wan22_ThroatV3_")
+                }
+                low = {
+                    item["lora"]: (item["strength"], item["on"])
+                    for item in by_id[324]["widgets_values"]
+                    if isinstance(item, dict)
+                    and item.get("lora", "").startswith("Wan22_ThroatV3_")
+                }
+                self.assertEqual(
+                    high, {"Wan22_ThroatV3_High.safetensors": (1.0, False)}
+                )
+                self.assertEqual(
+                    low, {"Wan22_ThroatV3_Low.safetensors": (1.0, False)}
+                )
 
     def test_batch10_inherits_optional_iroiro_high_low_pairs(self):
         expected_high = {
