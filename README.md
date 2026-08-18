@@ -38,7 +38,7 @@ batch10は10本を同時にGPUへ載せません。専用の一括投入欄へ10
 
 `prompts.txt`は1件のpromptを何行でも書けます。次の画像用promptとの間に空行を1行以上入れ、合計10ブロックにしてください。画像は`01.png`〜`10.png`のように命名します。旧形式の1行×10件、JSON文字列10件の配列、`---`区切りにも対応します。ZIP内に`prompts.txt`を含めればZIP 1個のdropだけで設定完了です。
 
-auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後・MP4 encode前で輪郭に沿ったモザイクを入れます。WANとVRAMを奪い合いません。
+auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後・MP4 encode前で輪郭に沿ったモザイクを入れます。既定対象は`pussy,penis,testicles`で、`anus`には適用しません。WANとVRAMを奪い合いません。
 
 ## 起動の流れ
 

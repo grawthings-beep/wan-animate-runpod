@@ -820,7 +820,7 @@ def _auto_mosaic_node(node_id, position, order):
             0.50,
             0,
             3,
-            "pussy,anus,penis,testicles",
+            "pussy,penis,testicles",
         ],
         "title": "AUTO MOSAIC JUST CONTOUR (CPU)",
     }
@@ -907,7 +907,8 @@ def patch_auto_mosaic(loop, batch10=False):
             "encoding. Anime NSFW Detection v5.0 produces a per-pixel instance "
             "segmentation mask on CPU, so WAN keeps exclusive GPU VRAM. JUST "
             "matches the AutoMosaic iPhone contour preset: segmentation only "
-            "with a 4% mask dilation. block_size=0 automatically uses short "
+            "with a 4% mask dilation. Default targets are pussy, penis, and "
+            "testicles; anus is deliberately excluded. block_size=0 automatically uses short "
             "side / 50 (minimum 10 px). max_gap_frames=3 interpolates only "
             "brief detector misses, including across the loop seam; it never "
             "unions neighboring masks into frames that already have a valid "

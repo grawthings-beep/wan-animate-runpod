@@ -20,7 +20,9 @@ MODEL_CLASSES = (
     "x-ray",
     "testicles",
 )
-DEFAULT_CLASSES = "pussy,anus,penis,testicles"
+# Keep anal regions visible by default. Users can still opt in by adding
+# ``anus`` to the node's target_classes field.
+DEFAULT_CLASSES = "pussy,penis,testicles"
 COVERAGE_PRESETS = {
     # These match the AutoMosaic iPhone application's mask presets. JUST uses
     # only the instance segmentation contour; WIDE/SAFE add an ellipse.

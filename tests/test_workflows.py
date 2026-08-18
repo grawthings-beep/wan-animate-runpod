@@ -436,12 +436,14 @@ class WorkflowWiringTests(unittest.TestCase):
                         0.5,
                         0,
                         3,
-                        "pussy,anus,penis,testicles",
+                        "pussy,penis,testicles",
                     ],
                 )
                 self.assertEqual(
                     graph["extra"]["runpod_bundle"]["profile"], "loop-all"
                 )
+                note = next(node for node in graph["nodes"] if node["id"] == 323)
+                self.assertIn("anus is deliberately excluded", note["widgets_values"])
 
     def test_core_variants_only_reference_enabled_loras(self):
         for path in CORE_WORKFLOWS:

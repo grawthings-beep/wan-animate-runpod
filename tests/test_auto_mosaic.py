@@ -56,7 +56,7 @@ class AutoMosaicHelperTests(unittest.TestCase):
         self.assertTrue(np.all(result[3:6, 3:6] == result[3, 3]))
         self.assertFalse(np.array_equal(result[0, 0], result[3, 3]))
 
-    def test_default_targets_exclude_large_context_class(self):
+    def test_default_targets_exclude_anus_and_large_context_classes(self):
         ids = self.module._selected_class_ids(
             {
                 0: "nipples",
@@ -69,7 +69,7 @@ class AutoMosaicHelperTests(unittest.TestCase):
             },
             self.module.DEFAULT_CLASSES,
         )
-        self.assertEqual(ids, [1, 2, 3, 6])
+        self.assertEqual(ids, [1, 3, 6])
 
     def test_auto_block_size_matches_iphone_short_side_rule(self):
         self.assertEqual(self.module._resolve_block_size(0, 528, 704), 11)
