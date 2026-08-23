@@ -201,6 +201,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "loop-iroiro-low-loras",
                 "rife49",
                 "auto-mosaic",
+                "upscale-nmkd",
             },
         )
         selected = {
@@ -208,7 +209,8 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 28)
+        self.assertEqual(len(selected), 29)
+        self.assertIn("4x_NMKD-Siax_200k.pth", selected)
         self.assertIn("animeNSFWDetection_v50.zip", selected)
         self.assertIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
@@ -486,6 +488,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "loop-xxx-loras",
                 "rife49",
                 "auto-mosaic",
+                "upscale-nmkd",
             },
         )
 

@@ -350,6 +350,90 @@ def nodes_in_group(graph, group_id):
     ]
 
 
+def patch_loop_model_upscale(graph):
+    """Replace the loop preset's Lanczos resize with a stable model upscale.
+
+    The 4x NMKD-Siax pass restores detail per decoded frame. A subsequent
+    nearest-exact 0.5 resize preserves the workflow's existing net 2x output
+    resolution without adding a large video-upscaler dependency or keeping a
+    second diffusion model resident beside WAN.
+    """
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    downscale = by_id[320]
+    source_link_id = downscale["inputs"][0]["link"]
+    source_link = _top_level_link(graph, source_link_id)
+
+    loader_id = graph["last_node_id"] + 1
+    upscale_id = loader_id + 1
+    graph["last_node_id"] = upscale_id
+
+    loader = {
+        "id": loader_id,
+        "type": "UpscaleModelLoader",
+        "pos": [300, 3100],
+        "size": [270, 58],
+        "flags": {},
+        "order": 139,
+        "mode": 0,
+        "inputs": [
+            {
+                "name": "model_name",
+                "type": "COMBO",
+                "widget": {"name": "model_name"},
+                "link": None,
+            }
+        ],
+        "outputs": [
+            {"name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": []}
+        ],
+        "title": "AI UPSCALE MODEL (67 MB)",
+        "properties": {
+            "Node name for S&R": "UpscaleModelLoader",
+            "cnr_id": "comfy-core",
+        },
+        "widgets_values": "4x_NMKD-Siax_200k.pth",
+        "color": "#233",
+        "bgcolor": "#355",
+    }
+    upscale = {
+        "id": upscale_id,
+        "type": "ImageUpscaleWithModel",
+        "pos": [300, 3200],
+        "size": [250, 72],
+        "flags": {},
+        "order": 140,
+        "mode": 0,
+        "inputs": [
+            {"name": "upscale_model", "type": "UPSCALE_MODEL", "link": None},
+            {"name": "image", "type": "IMAGE", "link": source_link_id},
+        ],
+        "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": []}],
+        "title": "NMKD-SIAX MODEL UPSCALE 4x",
+        "properties": {
+            "Node name for S&R": "ImageUpscaleWithModel",
+            "cnr_id": "comfy-core",
+        },
+        "widgets_values": [],
+        "color": "#233",
+        "bgcolor": "#355",
+    }
+    graph["nodes"].extend([loader, upscale])
+
+    # Preserve the decode node's existing serialized output link, changing
+    # only its destination from ImageScaleBy to the model upscaler.
+    source_link[3] = upscale_id
+    source_link[4] = 1
+    downscale["inputs"][0]["link"] = None
+    append_link(graph, loader_id, 0, upscale_id, 0, "UPSCALE_MODEL")
+    append_link(graph, upscale_id, 0, downscale["id"], 0, "IMAGE")
+
+    downscale["pos"] = [580, 3200]
+    downscale["order"] = 141
+    downscale["title"] = "NET 2x OUTPUT (4x MODEL -> 0.5x)"
+    downscale["widgets_values"] = ["nearest-exact", 0.5]
+    return graph
+
+
 def patch_loop(aio):
     graph = copy.deepcopy(aio)
 
@@ -467,6 +551,7 @@ def patch_loop(aio):
         combine["filename_prefix"] = "Video/loops/%date:yyyy-MM-dd%/%date:hhmmss%-loop"
         combine["loop_count"] = 0
 
+    patch_loop_model_upscale(graph)
     graph.setdefault("extra", {})["runpod_bundle"]["preset"] = "seamless-loop"
     graph["extra"]["runpod_bundle"]["profile"] = "loop-all"
     return graph

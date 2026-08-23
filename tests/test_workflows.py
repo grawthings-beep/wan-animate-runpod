@@ -25,6 +25,7 @@ CORE_WORKFLOWS = (
     / "workflows"
     / "wan22_smooth_v6_seamless_loop_batch10_core_auto_mosaic_runpod.json",
 )
+LOOP_WORKFLOWS = (*WORKFLOWS[1:], *MOSAIC_WORKFLOWS, *CORE_WORKFLOWS)
 LIGHTNING = (
     ROOT / "workflows" / "wan22_native_enhanced_lightning_longvideo_runpod.json"
 )
@@ -481,6 +482,48 @@ class WorkflowWiringTests(unittest.TestCase):
                 )
                 note = next(node for node in graph["nodes"] if node["id"] == 323)
                 self.assertIn("anus is deliberately excluded", note["widgets_values"])
+
+    def test_loop_variants_use_nmkd_model_upscale_at_net_two_x(self):
+        for path in LOOP_WORKFLOWS:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                by_id = {node["id"]: node for node in graph["nodes"]}
+                links = {link[0]: link for link in graph["links"]}
+                loaders = [
+                    node
+                    for node in graph["nodes"]
+                    if node["type"] == "UpscaleModelLoader"
+                ]
+                upscalers = [
+                    node
+                    for node in graph["nodes"]
+                    if node["type"] == "ImageUpscaleWithModel"
+                ]
+                self.assertEqual(len(loaders), 1)
+                self.assertEqual(len(upscalers), 1)
+                loader = loaders[0]
+                upscaler = upscalers[0]
+                self.assertEqual(
+                    loader["widgets_values"], "4x_NMKD-Siax_200k.pth"
+                )
+
+                upscale_inputs = {item["name"]: item for item in upscaler["inputs"]}
+                model_link = links[upscale_inputs["upscale_model"]["link"]]
+                image_link = links[upscale_inputs["image"]["link"]]
+                self.assertEqual(model_link[1:3], [loader["id"], 0])
+                self.assertEqual(by_id[image_link[1]]["type"], "VAEDecode")
+
+                downscale = by_id[320]
+                self.assertEqual(downscale["widgets_values"], ["nearest-exact", 0.5])
+                downscale_link = links[downscale["inputs"][0]["link"]]
+                self.assertEqual(downscale_link[1:3], [upscaler["id"], 0])
+                self.assertFalse(
+                    any(
+                        node["type"] == "ImageScaleBy"
+                        and node.get("widgets_values") == ["lanczos", 2.0]
+                        for node in graph["nodes"]
+                    )
+                )
 
     def test_core_variants_only_reference_enabled_loras(self):
         for path in CORE_WORKFLOWS:

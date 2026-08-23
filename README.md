@@ -19,11 +19,13 @@ Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ�
 
 | profile | assets | download | 内容 |
 |---|---:|---:|---|
-| `loop-core` | 12 | 40.96 GB | 実際にONのLightX2V、NSFW-22、SmoothXXXAnimation High/Low、WAN本体、encoder、VAE、RIFE、モザイク検出器 |
-| `loop-all` | 28 | 46.74 GB | coreにCumshot、JOI、Deepthroat/Face Fuck v3、iroiro 5組のOFF LoRAを追加 |
-| `loop-quality` | 28 | 46.74 GB | 旧設定互換の`loop-all` alias |
+| `loop-core` | 13 | 41.02 GB | 実際にONのLightX2V、NSFW-22、SmoothXXXAnimation High/Low、WAN本体、encoder、VAE、RIFE、モザイク検出器、NMKD-Siax AI upscaler |
+| `loop-all` | 29 | 46.81 GB | coreにCumshot、JOI、Deepthroat/Face Fuck v3、iroiro 5組のOFF LoRAを追加 |
+| `loop-quality` | 29 | 46.81 GB | 旧設定互換の`loop-all` alias |
 
 最短起動なら`MODEL_PROFILE=loop-core`、追加済みLoRAを画面から選びたいなら`loop-all`です。core workflowにはOFF LoRAの行自体がないため、不足モデル警告も出ません。
+
+loop系はLanczos拡大ではなく、デコードした各フレームを`4x_NMKD-Siax_200k`で4倍AIアップスケールしてから`nearest-exact`で0.5倍へ戻すため、最終サイズは従来どおり実質2倍です。標準のComfyUIノードだけを使い、追加ダウンロードは約67 MBです。
 
 ## Bundled workflows
 

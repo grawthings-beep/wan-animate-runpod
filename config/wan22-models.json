@@ -4,7 +4,7 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "auto-mosaic", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "auto-mosaic", "upscale-nmkd", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
@@ -12,15 +12,15 @@
     },
     "loop-core": {
       "description": "Production seamless-loop pack with only the three enabled High/Low LoRA pairs, core encoders, RIFE 4.9, and the CPU contour-mosaic detector. No disabled optional LoRAs are downloaded or shown.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49", "auto-mosaic"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "loop-all": {
       "description": "Complete seamless-loop pack. Adds Cumshot Aesthetics, JOI Handjob Trend, Deepthroat/Face Fuck v3, and all five iroiroLoRA High/Low pairs to loop-core for optional manual use.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "loop-quality": {
       "description": "Deprecated compatibility alias for loop-all. New templates should use loop-core or loop-all.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -28,7 +28,7 @@
     },
     "lightning-longvideo": {
       "description": "Everything referenced by the production Native Enhanced Lightning long-video workflow: its connected Q8 High/Low pair, optional LoRAs, RIFE, and upscaler.",
-      "include_groups": ["text-common", "lightx-i2v", "lightx-i2v-extra", "rife49", "alternate-gguf", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "lightx-i2v", "lightx-i2v-extra", "rife49", "alternate-gguf", "lightning-native-models", "lightning-native-loras", "lightning-native-tools", "upscale-nmkd"]
     }
   },
   "models": [
@@ -523,7 +523,7 @@
     },
     {
       "name": "4x NMKD Siax 200k upscaler",
-      "group": "lightning-native-tools",
+      "group": "upscale-nmkd",
       "url": "https://huggingface.co/uwg/upscaler/resolve/f6bace545e358eab5491f8f39b90a2dd42e8cc77/ESRGAN/4x_NMKD-Siax_200k.pth",
       "path": "models/upscale_models/4x_NMKD-Siax_200k.pth",
       "size_bytes": 66957746,
