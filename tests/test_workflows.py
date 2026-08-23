@@ -525,6 +525,92 @@ class WorkflowWiringTests(unittest.TestCase):
                     )
                 )
 
+    def test_loop_canvases_are_compact_aligned_and_non_overlapping(self):
+        def node_rect(node):
+            x, y = map(float, node["pos"])
+            width, height = map(float, node.get("size", [220, 80])[:2])
+            return (x, y, x + width, y + height)
+
+        def group_rect(group):
+            x, y, width, height = map(float, group["bounding"])
+            return (x, y, x + width, y + height)
+
+        def overlaps(first, second):
+            return (
+                min(first[2], second[2]) - max(first[0], second[0]) > 0.01
+                and min(first[3], second[3]) - max(first[1], second[1]) > 0.01
+            )
+
+        def contains(outer, inner):
+            return (
+                inner[0] >= outer[0] - 0.01
+                and inner[1] >= outer[1] - 0.01
+                and inner[2] <= outer[2] + 0.01
+                and inner[3] <= outer[3] + 0.01
+            )
+
+        removed_source_decorations = {
+            105,
+            106,
+            263,
+            264,
+            306,
+            307,
+            309,
+            310,
+            386,
+            387,
+            388,
+            397,
+            398,
+            403,
+        }
+        for path in LOOP_WORKFLOWS:
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                nodes = graph["nodes"]
+                groups = graph["groups"]
+                self.assertTrue(
+                    removed_source_decorations.isdisjoint(
+                        {node["id"] for node in nodes}
+                    )
+                )
+
+                for index, first in enumerate(nodes):
+                    for second in nodes[index + 1 :]:
+                        self.assertFalse(
+                            overlaps(node_rect(first), node_rect(second)),
+                            f"nodes {first['id']} and {second['id']} overlap",
+                        )
+
+                parent = next(group for group in groups if group["id"] == 36)
+                parent_bounds = group_rect(parent)
+                children = [group for group in groups if group["id"] != 36]
+                for node in nodes:
+                    self.assertTrue(contains(parent_bounds, node_rect(node)))
+                    memberships = [
+                        group["id"]
+                        for group in children
+                        if contains(group_rect(group), node_rect(node))
+                    ]
+                    self.assertEqual(
+                        memberships,
+                        memberships[:1],
+                        f"node {node['id']} is inside multiple groups",
+                    )
+                    self.assertEqual(
+                        len(memberships),
+                        1,
+                        f"node {node['id']} is outside every lane",
+                    )
+
+                for index, first in enumerate(children):
+                    for second in children[index + 1 :]:
+                        self.assertFalse(
+                            overlaps(group_rect(first), group_rect(second)),
+                            f"groups {first['id']} and {second['id']} overlap",
+                        )
+
     def test_core_variants_only_reference_enabled_loras(self):
         for path in CORE_WORKFLOWS:
             with self.subTest(path=path.name):

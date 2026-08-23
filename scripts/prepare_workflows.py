@@ -434,6 +434,95 @@ def patch_loop_model_upscale(graph):
     return graph
 
 
+def _layout_node(by_id, node_id, position, size=None):
+    node = by_id[node_id]
+    node["pos"] = list(position)
+    if size is not None:
+        node["size"] = list(size)
+
+
+def _upsert_group(graph, group_id, title, bounding, color):
+    group = next(
+        (item for item in graph.get("groups", []) if item["id"] == group_id),
+        None,
+    )
+    if group is None:
+        group = {"id": group_id, "flags": {}}
+        graph.setdefault("groups", []).append(group)
+    group.update(
+        {
+            "title": title,
+            "bounding": list(bounding),
+            "color": color,
+            "flags": group.get("flags", {}),
+        }
+    )
+
+
+def patch_loop_layout(graph):
+    """Arrange the single-loop canvas into compact, non-overlapping lanes."""
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    lora_height = max(by_id[324]["size"][1], by_id[325]["size"][1]) + 100
+    group_specs = (
+        (36, "WAN 2.2 SEAMLESS LOOP — SINGLE IMAGE", [0, 0, 5520, 1770], "#24506b"),
+        (37, "1. WAN HIGH / LOW MODELS", [40, 40, 520, 360], "#3f789e"),
+        (45, "2. HIGH / LOW LoRA STACKS", [590, 40, 940, lora_height], "#654ea3"),
+        (38, "3. CLIP / VAE", [1560, 40, 370, 500], "#4c7c59"),
+        (46, "4. MODEL SAMPLING", [1960, 40, 370, 400], "#8b6536"),
+        (57, "START HERE — LOOP GUIDE", [2370, 40, 980, 800], "#8b3f61"),
+        (39, "5. FIRST FRAME", [40, 880, 520, 840], "#3f789e"),
+        (48, "6. LAST FRAME — SAME IMAGE", [590, 880, 520, 840], "#3f789e"),
+        (44, "7. POSITIVE / NEGATIVE PROMPTS", [1140, 880, 560, 850], "#5b4ca3"),
+        (40, "8. VIDEO SIZE / LENGTH", [1730, 880, 540, 850], "#3f855a"),
+        (41, "9. SEED / SAMPLERS", [2300, 880, 650, 850], "#8b6536"),
+        (58, "10. LOOP CONDITIONING", [2980, 880, 360, 420], "#3f789e"),
+        (56, "11. DECODE / AI UPSCALE / RIFE", [3370, 880, 1560, 500], "#7a3f83"),
+        (42, "12. VIDEO RESULT", [4960, 880, 520, 500], "#2f855a"),
+    )
+    for spec in group_specs:
+        _upsert_group(graph, *spec)
+
+    layout = {
+        315: ((70, 110), (430, 82)),
+        316: ((70, 230), (430, 82)),
+        325: ((620, 90), (420, by_id[325]["size"][1])),
+        324: ((1060, 90), (427, by_id[324]["size"][1])),
+        301: ((1590, 110), (270, 116)),
+        351: ((1590, 250), (270, 58)),
+        341: ((1590, 330), (270, 58)),
+        297: ((1990, 110), (315, 58)),
+        298: ((1990, 210), (315, 58)),
+        323: ((2400, 90), (920, 700)),
+        338: ((70, 930), (460, 650)),
+        352: ((185, 1620), (230, 40)),
+        342: ((620, 930), (460, 650)),
+        350: ((735, 1620), (230, 40)),
+        333: ((1170, 930), (500, 280)),
+        304: ((1170, 1230), (500, 150)),
+        305: ((1170, 1400), (500, 160)),
+        312: ((1170, 1580), (500, 120)),
+        328: ((1760, 930), (480, 330)),
+        335: ((1760, 1280), (240, 90)),
+        322: ((2020, 1280), (190, 46)),
+        321: ((1760, 1390), (460, 180)),
+        327: ((2330, 930), (590, 100)),
+        329: ((2330, 1050), (285, 560)),
+        330: ((2635, 1050), (285, 560)),
+        343: ((3010, 930), (300, 250)),
+        383: ((3400, 950), (173, 26)),
+        384: ((3590, 940), (210, 46)),
+        404: ((3400, 1040), (270, 58)),
+        405: ((3690, 1040), (250, 72)),
+        320: ((3960, 1040), (250, 82)),
+        385: ((4230, 1060), (173, 26)),
+        399: ((4430, 930), (322, 270)),
+        332: ((4980, 930), (480, 334)),
+    }
+    for node_id, (position, size) in layout.items():
+        _layout_node(by_id, node_id, position, size)
+    return graph
+
+
 def patch_loop(aio):
     graph = copy.deepcopy(aio)
 
@@ -451,10 +540,32 @@ def patch_loop(aio):
     # The loop branch's GGUF loaders are disconnected alternates. Audio is
     # intentionally omitted because independently generated sound cannot loop
     # cleanly at the video boundary.
-    unused_node_ids.update({308, 313, 339, 358, 359})
+    unused_node_ids.update(
+        {
+            105,
+            106,
+            263,
+            264,
+            306,
+            307,
+            308,
+            309,
+            310,
+            313,
+            339,
+            358,
+            359,
+            386,
+            387,
+            388,
+            397,
+            398,
+            403,
+        }
+    )
     remove_nodes(graph, unused_node_ids)
 
-    keep_group_ids = {36, 37, 38, 39, 40, 41, 42, 44, 45, 46, 48, 52}
+    keep_group_ids = {36, 37, 38, 39, 40, 41, 42, 44, 45, 46, 48}
     graph["groups"] = [
         group for group in graph.get("groups", []) if group["id"] in keep_group_ids
     ]
@@ -552,6 +663,7 @@ def patch_loop(aio):
         combine["loop_count"] = 0
 
     patch_loop_model_upscale(graph)
+    patch_loop_layout(graph)
     graph.setdefault("extra", {})["runpod_bundle"]["preset"] = "seamless-loop"
     graph["extra"]["runpod_bundle"]["profile"] = "loop-all"
     return graph
@@ -569,6 +681,7 @@ def patch_loop_core(loop):
             if isinstance(item, dict) and item.get("lora") and item.get("on")
         ]
         configure_lora_node(node, enabled)
+        node["size"][1] = 190 + 48 * len(enabled)
 
     note = next((node for node in graph["nodes"] if node.get("id") == 323), None)
     if note:
@@ -582,6 +695,7 @@ def patch_loop_core(loop):
             + str(note.get("widgets_values") or "")
         )
 
+    patch_loop_layout(graph)
     bundle = graph.setdefault("extra", {}).setdefault("runpod_bundle", {})
     bundle["preset"] = "seamless-loop-core"
     bundle["profile"] = "loop-core"
@@ -715,6 +829,81 @@ def _loop_finalizer_node(node_id, position, order):
     }
 
 
+def patch_loop_batch10_layout(graph, slot_ids, selector_id, finalizer_id):
+    """Compact the ten-slot preset and align its generation pipeline."""
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    lora_height = max(by_id[324]["size"][1], by_id[325]["size"][1]) + 100
+    group_specs = (
+        (36, "WAN 2.2 SEAMLESS LOOP — 10 SEQUENTIAL JOBS", [0, 0, 7410, 1860], "#24506b"),
+        (53, "1. DROP 10 IMAGES + 10 PROMPTS", [40, 40, 1120, 1780], "#3f789e"),
+        (54, "2. BULK DROP + QUEUE CONTROL", [1190, 40, 660, 820], "#5b4ca3"),
+        (37, "3. WAN HIGH / LOW MODELS", [1900, 40, 520, 360], "#3f789e"),
+        (45, "4. HIGH / LOW LoRA STACKS", [2450, 40, 940, lora_height], "#654ea3"),
+        (38, "5. CLIP / VAE", [3420, 40, 370, 500], "#4c7c59"),
+        (46, "6. MODEL SAMPLING", [3820, 40, 370, 400], "#8b6536"),
+        (57, "START HERE — BATCH GUIDE", [4230, 40, 980, 800], "#8b3f61"),
+        (59, "7. BATCH PROMPT ENCODING", [1900, 900, 560, 800], "#5b4ca3"),
+        (60, "8. SHARED LOOP IMAGE CONDITIONING", [2490, 900, 560, 300], "#3f789e"),
+        (40, "9. VIDEO SIZE / LENGTH", [3080, 900, 540, 800], "#3f855a"),
+        (41, "10. SEED / SAMPLERS", [3650, 900, 650, 800], "#8b6536"),
+        (58, "11. LOOP CONDITIONING", [4330, 900, 360, 420], "#3f789e"),
+        (56, "12. DECODE / AI UPSCALE / RIFE", [4720, 900, 1560, 500], "#7a3f83"),
+        (42, "13. VIDEO RESULT", [6310, 900, 520, 500], "#2f855a"),
+        (55, "14. ZIP AFTER ALL 10", [6870, 900, 500, 300], "#2f855a"),
+    )
+    for spec in group_specs:
+        _upsert_group(graph, *spec)
+
+    for index, node_id in enumerate(slot_ids):
+        column = index % 2
+        row = index // 2
+        _layout_node(
+            by_id,
+            node_id,
+            (70 + column * 540, 90 + row * 340),
+            (510, 300),
+        )
+    _layout_node(by_id, selector_id, (1220, 90), (600, 720))
+    _layout_node(by_id, finalizer_id, (6900, 950), (440, 180))
+
+    layout = {
+        315: ((1930, 110), (430, 82)),
+        316: ((1930, 230), (430, 82)),
+        325: ((2480, 90), (420, by_id[325]["size"][1])),
+        324: ((2920, 90), (427, by_id[324]["size"][1])),
+        301: ((3450, 110), (270, 116)),
+        351: ((3450, 250), (270, 58)),
+        341: ((3450, 330), (270, 58)),
+        297: ((3850, 110), (315, 58)),
+        298: ((3850, 210), (315, 58)),
+        323: ((4260, 90), (920, 700)),
+        305: ((1930, 950), (500, 180)),
+        304: ((1930, 1150), (500, 150)),
+        312: ((1930, 1320), (500, 120)),
+        352: ((2520, 960), (230, 40)),
+        350: ((2770, 960), (230, 40)),
+        328: ((3110, 950), (480, 330)),
+        335: ((3110, 1300), (240, 90)),
+        322: ((3370, 1300), (190, 46)),
+        321: ((3110, 1410), (460, 180)),
+        327: ((3680, 950), (590, 100)),
+        329: ((3680, 1070), (285, 560)),
+        330: ((3985, 1070), (285, 560)),
+        343: ((4360, 950), (300, 250)),
+        383: ((4750, 970), (173, 26)),
+        384: ((4940, 960), (210, 46)),
+        404: ((4750, 1060), (270, 58)),
+        405: ((5040, 1060), (250, 72)),
+        320: ((5310, 1060), (250, 82)),
+        385: ((5580, 1080), (173, 26)),
+        399: ((5780, 950), (322, 270)),
+        332: ((6330, 950), (480, 334)),
+    }
+    for node_id, (position, size) in layout.items():
+        _layout_node(by_id, node_id, position, size)
+    return graph
+
+
 def patch_loop_batch10(loop):
     """Create ten independent sequential queue jobs from one loop graph."""
     graph = copy.deepcopy(loop)
@@ -729,9 +918,6 @@ def patch_loop_batch10(loop):
     graph["groups"] = [
         group for group in graph.get("groups", []) if group["id"] not in {39, 44, 48}
     ]
-    main_group = next(group for group in graph["groups"] if group["id"] == 36)
-    main_group["bounding"] = [-5240, 2299, 7060, 4150]
-
     first_id = graph["last_node_id"] + 1
     slot_ids = list(range(first_id, first_id + 10))
     selector_id = first_id + 10
@@ -739,21 +925,19 @@ def patch_loop_batch10(loop):
     next_order = max(node.get("order", 0) for node in graph["nodes"]) + 1
 
     for index, node_id in enumerate(slot_ids):
-        column = index % 2
-        row = index // 2
         graph["nodes"].append(
             _loop_slot_node(
                 node_id,
                 index + 1,
-                (-5160 + column * 560, 3020 + row * 650),
+                (0, 0),
                 next_order + index,
             )
         )
     graph["nodes"].append(
-        _loop_selector_node(selector_id, (-4020, 3020), next_order + 10)
+        _loop_selector_node(selector_id, (0, 0), next_order + 10)
     )
     graph["nodes"].append(
-        _loop_finalizer_node(finalizer_id, (1400, 3020), next_order + 11)
+        _loop_finalizer_node(finalizer_id, (0, 0), next_order + 11)
     )
     graph["last_node_id"] = finalizer_id
 
@@ -788,26 +972,28 @@ def patch_loop_batch10(loop):
             {
                 "id": 53,
                 "title": "10 IMAGES + 10 POSITIVE PROMPTS",
-                "bounding": [-5210, 2920, 1110, 3440],
+                "bounding": [0, 0, 1, 1],
                 "color": "#3f789e",
                 "flags": {},
             },
             {
                 "id": 54,
                 "title": "BULK DROP + SEQUENTIAL QUEUE CONTROL",
-                "bounding": [-4070, 2920, 700, 850],
+                "bounding": [0, 0, 1, 1],
                 "color": "#5b4ca3",
                 "flags": {},
             },
             {
                 "id": 55,
                 "title": "ZIP DOWNLOAD AFTER ALL 10",
-                "bounding": [1360, 2920, 500, 300],
+                "bounding": [0, 0, 1, 1],
                 "color": "#2f855a",
                 "flags": {},
             },
         ]
     )
+
+    patch_loop_batch10_layout(graph, slot_ids, selector_id, finalizer_id)
 
     by_id = {node["id"]: node for node in graph["nodes"]}
     by_id[323]["widgets_values"] = (
@@ -937,7 +1123,7 @@ def patch_auto_mosaic(loop, batch10=False):
     mosaic_id = graph["last_node_id"] + 1
     mosaic = _auto_mosaic_node(
         mosaic_id,
-        (1280, 2900),
+        (0, 0),
         max(node.get("order", 0) for node in graph["nodes"]) + 1,
     )
     graph["nodes"].append(mosaic)
@@ -951,7 +1137,6 @@ def patch_auto_mosaic(loop, batch10=False):
     combine_images["link"] = None
     append_link(graph, mosaic_id, 0, combine["id"], combine_slot, "IMAGE")
 
-    combine["pos"] = [1710, 3015]
     values = combine.get("widgets_values")
     if isinstance(values, dict) and not batch10:
         values["filename_prefix"] = (
@@ -963,11 +1148,38 @@ def patch_auto_mosaic(loop, batch10=False):
         {
             "id": group_id,
             "title": "POST-RIFE AUTO MOSAIC (CPU / LOOP-SAFE)",
-            "bounding": [1240, 2800, 450, 500],
+            "bounding": [0, 0, 1, 1],
             "color": "#7a3f83",
             "flags": {},
         }
     )
+
+    parent_group = next(group for group in graph["groups"] if group["id"] == 36)
+    result_group = next(group for group in graph["groups"] if group["id"] == 42)
+    if batch10:
+        mosaic["pos"] = [6320, 950]
+        combine["pos"] = [6780, 950]
+        parent_group["bounding"] = [0, 0, 7820, 1860]
+        result_group.update(
+            {
+                "title": "14. MOSAICKED VIDEO RESULT",
+                "bounding": [6760, 900, 520, 500],
+            }
+        )
+        mosaic_group_bounds = [6310, 900, 430, 500]
+    else:
+        mosaic["pos"] = [4970, 930]
+        combine["pos"] = [5430, 930]
+        parent_group["bounding"] = [0, 0, 5980, 1770]
+        result_group.update(
+            {
+                "title": "13. MOSAICKED VIDEO RESULT",
+                "bounding": [5410, 880, 520, 500],
+            }
+        )
+        mosaic_group_bounds = [4960, 880, 430, 500]
+    mosaic_group = next(group for group in graph["groups"] if group["id"] == group_id)
+    mosaic_group["bounding"] = mosaic_group_bounds
 
     finalizer = next(
         (
@@ -978,13 +1190,18 @@ def patch_auto_mosaic(loop, batch10=False):
         None,
     )
     if finalizer:
-        finalizer["pos"] = [2100, 3020]
+        finalizer["pos"] = [7310, 950]
         zip_group = next(
-            (group for group in graph["groups"] if group["title"] == "ZIP DOWNLOAD AFTER ALL 10"),
+            (group for group in graph["groups"] if group["id"] == 55),
             None,
         )
         if zip_group:
-            zip_group["bounding"][0] = 2060
+            zip_group.update(
+                {
+                    "title": "15. ZIP AFTER ALL 10",
+                    "bounding": [7280, 900, 500, 300],
+                }
+            )
 
     note = by_id.get(323)
     if note:
