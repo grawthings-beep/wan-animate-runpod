@@ -110,6 +110,17 @@ BOOT PHASE: comfyui-exec
 
 Edgeだけ403になりChromeでは開く場合、RunPod proxy自体ではなくEdge側に残ったRunPod認証cookie・追跡防止・拡張機能が原因です。InPrivateで開く、`runpod.net`のsite dataを削除、追跡防止をBalancedへ変更の順で確認します。
 
+## 通常I2V＋自動モザイク
+
+ループさせない動画は`wan22_smooth_v6_i2v_auto_mosaic_runpod.json`を開きます。
+
+1. `1. SELECT START IMAGE`へ開始画像を1枚入れます。
+2. positive promptへ開始から終了までの動作を時系列で書きます。開始姿勢へ戻す指示は不要です。
+3. 必要なLoRAはHigh／Lowの対応する2行を両方ONにします。Deepthroat/Face Fuck v3は`Wan22_ThroatV3_High`と`Wan22_ThroatV3_Low`です。
+4. Queueすると、通常I2V、AIアップスケール、RIFE、自動モザイク、MP4保存の順に1本だけ実行されます。
+
+このworkflowは`MODEL_PROFILE=loop-all`の29 assetをそのまま利用するため、上記の環境変数を変更する必要はありません。モザイク対象は既定で`pussy,penis,testicles`、`anus`は除外です。
+
 ## Batch10の一括投入
 
 名前に`batch10`が付くworkflowを開き、`BULK DROP + QUEUE 10 LOOPS` nodeを使います。

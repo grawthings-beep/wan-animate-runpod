@@ -20,6 +20,9 @@ LIGHTNING_SOURCE = (
 )
 OUTPUTS = {
     "aio": ROOT / "workflows" / "wan22_smooth_v6_aio_runpod.json",
+    "i2v_mosaic": (
+        ROOT / "workflows" / "wan22_smooth_v6_i2v_auto_mosaic_runpod.json"
+    ),
     "loop": ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json",
     "loop_core": (
         ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_core_runpod.json"
@@ -350,8 +353,8 @@ def nodes_in_group(graph, group_id):
     ]
 
 
-def patch_loop_model_upscale(graph):
-    """Replace the loop preset's Lanczos resize with a stable model upscale.
+def patch_model_upscale(graph, downscale_id):
+    """Replace a preset's Lanczos resize with a stable model upscale.
 
     The 4x NMKD-Siax pass restores detail per decoded frame. A subsequent
     nearest-exact 0.5 resize preserves the workflow's existing net 2x output
@@ -359,7 +362,7 @@ def patch_loop_model_upscale(graph):
     second diffusion model resident beside WAN.
     """
     by_id = {node["id"]: node for node in graph["nodes"]}
-    downscale = by_id[320]
+    downscale = by_id[downscale_id]
     source_link_id = downscale["inputs"][0]["link"]
     source_link = _top_level_link(graph, source_link_id)
 
@@ -432,6 +435,10 @@ def patch_loop_model_upscale(graph):
     downscale["title"] = "NET 2x OUTPUT (4x MODEL -> 0.5x)"
     downscale["widgets_values"] = ["nearest-exact", 0.5]
     return graph
+
+
+def patch_loop_model_upscale(graph):
+    return patch_model_upscale(graph, 320)
 
 
 def _layout_node(by_id, node_id, position, size=None):
@@ -666,6 +673,203 @@ def patch_loop(aio):
     patch_loop_layout(graph)
     graph.setdefault("extra", {})["runpod_bundle"]["preset"] = "seamless-loop"
     graph["extra"]["runpod_bundle"]["profile"] = "loop-all"
+    return graph
+
+
+def patch_i2v_layout(graph):
+    """Arrange the one-image, non-loop I2V canvas into readable lanes."""
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    upscale_loader = next(
+        node for node in graph["nodes"] if node["type"] == "UpscaleModelLoader"
+    )
+    model_upscale = next(
+        node
+        for node in graph["nodes"]
+        if node["type"] == "ImageUpscaleWithModel"
+    )
+    lora_height = max(by_id[200]["size"][1], by_id[201]["size"][1]) + 100
+    group_specs = (
+        (34, "WAN 2.2 NORMAL I2V — SINGLE START IMAGE", [0, 0, 4560, 1770], "#24506b"),
+        (22, "1. WAN HIGH / LOW MODELS", [40, 40, 520, 360], "#3f789e"),
+        (31, "2. HIGH / LOW LoRA STACKS", [590, 40, 940, lora_height], "#654ea3"),
+        (23, "3. TEXT ENCODER / VAE", [1560, 40, 370, 500], "#4c7c59"),
+        (32, "4. MODEL SAMPLING", [1960, 40, 370, 400], "#8b6536"),
+        (60, "START HERE — NORMAL I2V GUIDE", [2370, 40, 980, 800], "#8b3f61"),
+        (24, "5. START IMAGE", [40, 880, 520, 840], "#3f789e"),
+        (30, "6. POSITIVE / NEGATIVE PROMPTS", [590, 880, 560, 850], "#5b4ca3"),
+        (25, "7. VIDEO SIZE / LENGTH / I2V", [1180, 880, 540, 850], "#3f855a"),
+        (27, "8. SEED / SAMPLERS", [1750, 880, 650, 850], "#8b6536"),
+        (61, "9. DECODE / AI UPSCALE / RIFE", [2430, 880, 1560, 500], "#7a3f83"),
+        (28, "10. VIDEO RESULT", [4020, 880, 520, 500], "#2f855a"),
+    )
+    for spec in group_specs:
+        _upsert_group(graph, *spec)
+
+    layout = {
+        197: ((70, 110), (430, 82)),
+        186: ((70, 230), (430, 82)),
+        201: ((620, 90), (420, by_id[201]["size"][1])),
+        200: ((1060, 90), (427, by_id[200]["size"][1])),
+        192: ((1590, 110), (270, 116)),
+        191: ((1590, 250), (270, 58)),
+        168: ((1990, 110), (315, 58)),
+        169: ((1990, 210), (315, 58)),
+        258: ((2400, 90), (920, 700)),
+        287: ((70, 930), (460, 650)),
+        233: ((620, 930), (500, 280)),
+        176: ((620, 1230), (500, 150)),
+        177: ((620, 1400), (500, 160)),
+        195: ((620, 1580), (500, 120)),
+        208: ((1210, 930), (480, 330)),
+        178: ((1210, 1280), (240, 90)),
+        232: ((1470, 1280), (190, 46)),
+        174: ((1210, 1390), (190, 46)),
+        182: ((1420, 1390), (250, 80)),
+        172: ((1210, 1490), (460, 200)),
+        210: ((1780, 930), (590, 100)),
+        236: ((1780, 1050), (285, 560)),
+        237: ((2085, 1050), (285, 560)),
+        179: ((2460, 950), (173, 26)),
+        171: ((2650, 940), (210, 46)),
+        upscale_loader["id"]: ((2460, 1040), (270, 58)),
+        model_upscale["id"]: ((2750, 1040), (250, 72)),
+        181: ((3020, 1040), (250, 82)),
+        199: ((3290, 1060), (173, 26)),
+        395: ((3490, 930), (322, 270)),
+        198: ((4050, 930), (480, 334)),
+    }
+    for node_id, (position, size) in layout.items():
+        _layout_node(by_id, node_id, position, size)
+    return graph
+
+
+def patch_i2v(aio):
+    """Build a one-image, non-loop Smooth v6 I2V production preset."""
+    graph = copy.deepcopy(aio)
+    branch_ids = {node["id"] for node in nodes_in_group(graph, 34)}
+    remove_nodes(
+        graph,
+        {node["id"] for node in graph["nodes"] if node["id"] not in branch_ids},
+    )
+
+    # Remove disconnected alternates, MMAudio, decorations, and the auxiliary
+    # last-frame preview chain. The retained graph has one image input and one
+    # GPU generation at a time, followed by CPU/RIFE post-processing.
+    remove_nodes(
+        graph,
+        {
+            164,
+            165,
+            166,
+            167,
+            196,
+            202,
+            204,
+            207,
+            211,
+            214,
+            242,
+            256,
+            257,
+            259,
+            260,
+            261,
+            262,
+            283,
+            356,
+            357,
+        },
+    )
+    for node in graph["nodes"]:
+        node["mode"] = 0
+
+    keep_group_ids = {22, 23, 24, 25, 27, 28, 30, 31, 32, 34}
+    graph["groups"] = [
+        group
+        for group in graph.get("groups", [])
+        if group["id"] in keep_group_ids
+    ]
+
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    configure_lora_node(
+        by_id[201],
+        [
+            lora(
+                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+                3.0,
+                True,
+            ),
+            lora("NSFW-22-H-e8.safetensors", 2.75, True),
+            lora("SmoothXXXAnimation_High.safetensors", 1.5, True),
+            lora("Cumshot_Aesthetics_High.safetensors", 1.0),
+            lora("I2V_joi_trend_high.safetensors", 1.0),
+            lora("Wan22_ThroatV3_High.safetensors", 1.0),
+            lora("cheek_bulge_fellatio_high_wan-2-2_i2v_A14B.safetensors", 1.0),
+            lora("glans_licking_high_wan-2-2_i2v_A14B.safetensors", 1.0),
+            lora("head_back_high_wan-2-2_i2v_A14B.safetensors", 1.0),
+            lora("paizuri_unaligned_breasts_high_wan-2-2_i2v_A14B.safetensors", 1.0),
+            lora("washizukami_high_wan-2-2_i2v_A14B.safetensors", 1.0),
+        ],
+    )
+    configure_lora_node(
+        by_id[200],
+        [
+            lora(
+                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+                1.5,
+                True,
+            ),
+            lora("NSFW-22-L-e8.safetensors", 1.65, True),
+            lora("SmoothXXXAnimation_Low.safetensors", 1.0, True),
+            lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
+            lora("I2V_joi_trend_low.safetensors", 1.0),
+            lora("Wan22_ThroatV3_Low.safetensors", 1.0),
+            lora("cheek_bulge_fellatio_wanvideo_i2v.safetensors", 1.0),
+            lora("glans_licking_wanvideo_i2v_epoch5.safetensors", 1.0),
+            lora("head_back_wanvideo_i2v_epoch5.safetensors", 1.0),
+            lora("paizuri_unaligned_breasts_wanvideo_i2v_epoch5.safetensors", 1.0),
+            lora("washizukami_wanvideo_i2v.safetensors", 1.0),
+        ],
+    )
+
+    resolution = by_id[208]
+    resolution["properties"]["valueX"] = 528
+    resolution["properties"]["valueY"] = 704
+    resolution["widgets_values"] = [528, 528, 704, 704, 0, 0]
+    by_id[287]["title"] = "1. SELECT START IMAGE"
+    by_id[258]["title"] = "START HERE — NORMAL I2V GUIDE"
+    by_id[258]["widgets_values"] = (
+        "NORMAL I2V + AUTO MOSAIC PRESET\n\n"
+        "Select one START IMAGE and write the actual chronological action in "
+        "the positive prompt. This is ordinary image-to-video: no last-frame "
+        "image is required, no return-to-start conditioning is present, and "
+        "the motion does not need to be cyclic. The default is 528 x 704, "
+        "5 seconds / 81 generated frames, AI model upscale to a net 2x size, "
+        "then RIFE x2 and CPU contour mosaic before MP4 encoding.\n\n"
+        "Core LoRAs are ON: LightX2V 3.0 High / 1.5 Low, NSFW-22 2.75 High / "
+        "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Cumshot "
+        "Aesthetics, JOI Handjob Trend, Deepthroat/Face Fuck v3, and five "
+        "iroiro High/Low pairs are available at 1.0 but OFF. Enable only the "
+        "matching High and Low pair needed for the shot. The Deepthroat v3 "
+        "pair is Wan22_ThroatV3_High / Wan22_ThroatV3_Low.\n\n"
+        "This preset is deliberately silent; it does not download or load "
+        "MMAudio models."
+    )
+    combine = by_id[198].get("widgets_values")
+    if isinstance(combine, dict):
+        combine["filename_prefix"] = (
+            "Video/i2v/%date:yyyy-MM-dd%/%date:hhmmss%-i2v"
+        )
+        combine["loop_count"] = 0
+
+    patch_model_upscale(graph, 181)
+    patch_i2v_layout(graph)
+    graph.setdefault("extra", {})["runpod_bundle"] = {
+        "profile": "loop-all",
+        "model_manifest": "config/wan22-models.json",
+        "source": "WAN 2.2 Smooth Workflow v6.0 I2V",
+        "preset": "i2v",
+    }
     return graph
 
 
@@ -1103,6 +1307,8 @@ def patch_auto_mosaic(loop, batch10=False):
     """Insert CPU auto-mosaic after RIFE and before the only MP4 encode."""
     graph = copy.deepcopy(loop)
     by_id = {node["id"]: node for node in graph["nodes"]}
+    existing_bundle = graph.get("extra", {}).get("runpod_bundle", {})
+    is_i2v = existing_bundle.get("preset") == "i2v"
     combine = next(
         node for node in graph["nodes"] if node["type"] == "VHS_VideoCombine"
     )
@@ -1139,24 +1345,50 @@ def patch_auto_mosaic(loop, batch10=False):
 
     values = combine.get("widgets_values")
     if isinstance(values, dict) and not batch10:
-        values["filename_prefix"] = (
-            "Video/loops-mosaic/%date:yyyy-MM-dd%/%date:hhmmss%-loop-mosaic"
-        )
+        if is_i2v:
+            values["filename_prefix"] = (
+                "Video/i2v-mosaic/%date:yyyy-MM-dd%/%date:hhmmss%-i2v-mosaic"
+            )
+        else:
+            values["filename_prefix"] = (
+                "Video/loops-mosaic/%date:yyyy-MM-dd%/%date:hhmmss%-loop-mosaic"
+            )
 
     group_id = max(group["id"] for group in graph.get("groups", [])) + 1
     graph.setdefault("groups", []).append(
         {
             "id": group_id,
-            "title": "POST-RIFE AUTO MOSAIC (CPU / LOOP-SAFE)",
+            "title": (
+                "POST-RIFE AUTO MOSAIC (CPU)"
+                if is_i2v
+                else "POST-RIFE AUTO MOSAIC (CPU / LOOP-SAFE)"
+            ),
             "bounding": [0, 0, 1, 1],
             "color": "#7a3f83",
             "flags": {},
         }
     )
 
-    parent_group = next(group for group in graph["groups"] if group["id"] == 36)
-    result_group = next(group for group in graph["groups"] if group["id"] == 42)
-    if batch10:
+    parent_id = 34 if is_i2v else 36
+    result_id = 28 if is_i2v else 42
+    parent_group = next(
+        group for group in graph["groups"] if group["id"] == parent_id
+    )
+    result_group = next(
+        group for group in graph["groups"] if group["id"] == result_id
+    )
+    if is_i2v:
+        mosaic["pos"] = [4020, 930]
+        combine["pos"] = [4480, 930]
+        parent_group["bounding"] = [0, 0, 5020, 1770]
+        result_group.update(
+            {
+                "title": "11. MOSAICKED I2V RESULT",
+                "bounding": [4460, 880, 520, 500],
+            }
+        )
+        mosaic_group_bounds = [4010, 880, 430, 500]
+    elif batch10:
         mosaic["pos"] = [6320, 950]
         combine["pos"] = [6780, 950]
         parent_group["bounding"] = [0, 0, 7820, 1860]
@@ -1203,8 +1435,16 @@ def patch_auto_mosaic(loop, batch10=False):
                 }
             )
 
-    note = by_id.get(323)
+    note = by_id.get(258 if is_i2v else 323)
     if note:
+        seam_text = (
+            "brief detector misses; it never unions neighboring masks into "
+            "frames that already have a valid contour. "
+            if is_i2v
+            else "brief detector misses, including across the loop seam; it "
+            "never unions neighboring masks into frames that already have a "
+            "valid contour. "
+        )
         note["widgets_values"] = (
             "AUTO MOSAIC OUTPUT PRESET\n\n"
             "Mosaic is applied to completed frames after RIFE and before MP4 "
@@ -1214,9 +1454,8 @@ def patch_auto_mosaic(loop, batch10=False):
             "with a 4% mask dilation. Default targets are pussy, penis, and "
             "testicles; anus is deliberately excluded. block_size=0 automatically uses short "
             "side / 50 (minimum 10 px). max_gap_frames=3 interpolates only "
-            "brief detector misses, including across the loop seam; it never "
-            "unions neighboring masks into frames that already have a valid "
-            "contour. WIDE and SAFE deliberately cover a larger ellipse.\n\n"
+            + seam_text
+            + "WIDE and SAFE deliberately cover a larger ellipse.\n\n"
             + str(note.get("widgets_values") or "")
         )
 
@@ -1224,9 +1463,13 @@ def patch_auto_mosaic(loop, batch10=False):
     bundle.update(
         {
             "preset": (
-                "seamless-loop-batch10-sequential-auto-mosaic"
-                if batch10
-                else "seamless-loop-auto-mosaic"
+                "i2v-auto-mosaic"
+                if is_i2v
+                else (
+                    "seamless-loop-batch10-sequential-auto-mosaic"
+                    if batch10
+                    else "seamless-loop-auto-mosaic"
+                )
             ),
             "profile": bundle.get("profile", "loop-all"),
             "postprocess": "Anime NSFW Detection v5 YOLO11-seg JUST contour mosaic after RIFE (CPU)",
@@ -1348,12 +1591,14 @@ def main():
         LIGHTNING_SOURCE.read_text(encoding="utf-8-sig")
     )
     aio = patch_aio(smooth_source)
+    i2v = patch_i2v(aio)
     loop = patch_loop(aio)
     loop_core = patch_loop_core(loop)
     batch10 = patch_loop_batch10(loop)
     batch10_core = patch_loop_batch10(loop_core)
     generated = {
         "aio": encode(aio),
+        "i2v_mosaic": encode(patch_auto_mosaic(i2v)),
         "loop": encode(loop),
         "loop_core": encode(loop_core),
         "batch10": encode(batch10),

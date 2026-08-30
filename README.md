@@ -29,6 +29,7 @@ loop系はLanczos拡大ではなく、デコードした各フレームを`4x_NM
 
 ## Bundled workflows
 
+- `wan22_smooth_v6_i2v_auto_mosaic_runpod.json`（開始画像1枚の通常I2V。ループ条件なし、AIアップスケール・RIFE・CPU輪郭モザイク込み）
 - `wan22_smooth_v6_seamless_loop_core_runpod.json`
 - `wan22_smooth_v6_seamless_loop_core_auto_mosaic_runpod.json`
 - `wan22_smooth_v6_seamless_loop_batch10_core_runpod.json`
@@ -41,6 +42,8 @@ batch10は10本を同時にGPUへ載せません。専用の一括投入欄へ10
 `prompts.txt`は1件のpromptを何行でも書けます。次の画像用promptとの間に空行を1行以上入れ、合計10ブロックにしてください。画像は`01.png`〜`10.png`のように命名します。旧形式の1行×10件、JSON文字列10件の配列、`---`区切りにも対応します。ZIP内に`prompts.txt`を含めればZIP 1個のdropだけで設定完了です。
 
 auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後・MP4 encode前で輪郭に沿ったモザイクを入れます。既定対象は`pussy,penis,testicles`で、`anus`には適用しません。WANとVRAMを奪い合いません。
+
+通常I2Vモザイク版は開始画像を1枚だけ指定します。First/Last Frameや開始地点へ戻すconditioningを持たないため、登場・退場・一方向の動作など、ループに向かない時系列の動画をそのまま生成できます。Deepthroat/Face Fuck v3の`Wan22_ThroatV3_High` / `Wan22_ThroatV3_Low`もLoRA欄に1.0・OFFで収録済みです。
 
 ## 起動の流れ
 
@@ -73,7 +76,7 @@ auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後�
 
 mainへのpushごとに以下を実行します。
 
-- 10 workflowの再生成差分と55 asset manifestの整合検査
+- 11 workflowの再生成差分と55 asset manifestの整合検査
 - Python unit tests、JavaScript構文、shell構文
 - Ada/cu128とBlackwell/cu130を2 job並列build
 - 各image内で本番`start.sh`を`--quick-test-for-ci`実行し、custom node import、CLI、writable user/workflow pathを検査

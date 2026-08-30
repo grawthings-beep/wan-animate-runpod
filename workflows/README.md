@@ -2,6 +2,7 @@
 
 - `wan22_native_enhanced_lightning_longvideo_runpod.json`: 接続済みQ8 High/Lowによる5〜20秒の連続I2V、RIFE、upscaleを含む今回のworkflow（元zipの未接続FP8 loaderは除外）
 - `wan22_smooth_v6_aio_runpod.json`: Smooth v6のI2V / T2V / First-to-Last Frame / Audio2Video
+- `wan22_smooth_v6_i2v_auto_mosaic_runpod.json`: 開始画像1枚だけを使う非ループI2V。SmoothMix I2V v2、High/Low LoRA、NMKD-Siax実質2倍アップスケール、RIFE x2、完成frameへのJUST輪郭モザイクを直列接続（既定では`anus`を除外）
 - `wan22_smooth_v6_seamless_loop_runpod.json`: Smooth v6の音なしシームレスループ専用preset。別ブランチ、未接続GGUF、任意LoRA、MMAudioを除去
 - `wan22_smooth_v6_seamless_loop_batch10_runpod.json`: 10画像・10promptを独立した10ジョブとして逐次実行し、完了後に10本入りZIPを自動ダウンロード
 - `wan22_smooth_v6_seamless_loop_auto_mosaic_runpod.json`: 通常ループのRIFE後・MP4化前に専用YOLO11-segのJUST輪郭モザイクをCPU適用する別preset（既定では`anus`を除外）

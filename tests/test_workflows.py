@@ -26,6 +26,9 @@ CORE_WORKFLOWS = (
     / "wan22_smooth_v6_seamless_loop_batch10_core_auto_mosaic_runpod.json",
 )
 LOOP_WORKFLOWS = (*WORKFLOWS[1:], *MOSAIC_WORKFLOWS, *CORE_WORKFLOWS)
+I2V_MOSAIC = (
+    ROOT / "workflows" / "wan22_smooth_v6_i2v_auto_mosaic_runpod.json"
+)
 LIGHTNING = (
     ROOT / "workflows" / "wan22_native_enhanced_lightning_longvideo_runpod.json"
 )
@@ -84,7 +87,13 @@ class WorkflowWiringTests(unittest.TestCase):
                     self.assertEqual(negative[1:3], nag_negative[1:3])
 
     def test_every_top_level_link_matches_its_declared_slots(self):
-        for path in (*WORKFLOWS, *MOSAIC_WORKFLOWS, *CORE_WORKFLOWS, LIGHTNING):
+        for path in (
+            *WORKFLOWS,
+            *MOSAIC_WORKFLOWS,
+            *CORE_WORKFLOWS,
+            I2V_MOSAIC,
+            LIGHTNING,
+        ):
             with self.subTest(path=path.name):
                 graph = self.load(path)
                 links = {link[0]: link for link in graph["links"]}
@@ -482,6 +491,98 @@ class WorkflowWiringTests(unittest.TestCase):
                 )
                 note = next(node for node in graph["nodes"] if node["id"] == 323)
                 self.assertIn("anus is deliberately excluded", note["widgets_values"])
+
+    def test_normal_i2v_mosaic_is_single_image_non_loop_and_post_rife(self):
+        graph = self.load(I2V_MOSAIC)
+        by_id = {node["id"]: node for node in graph["nodes"]}
+        links = {link[0]: link for link in graph["links"]}
+        types = [node["type"] for node in graph["nodes"]]
+
+        self.assertEqual(types.count("LoadImage"), 1)
+        self.assertEqual(types.count("WanImageToVideo"), 1)
+        self.assertNotIn("WanFirstLastFrameToVideo", types)
+        self.assertNotIn("MMAudioModelLoader", types)
+        self.assertNotIn("MMAudioFeatureUtilsLoader", types)
+        self.assertNotIn("UnetLoaderGGUF", types)
+
+        conditioning = next(
+            node for node in graph["nodes"] if node["type"] == "WanImageToVideo"
+        )
+        start_image = next(
+            item for item in conditioning["inputs"] if item["name"] == "start_image"
+        )
+        resized = by_id[links[start_image["link"]][1]]
+        self.assertEqual(resized["type"], "ImageResizeKJv2")
+        source = by_id[links[resized["inputs"][0]["link"]][1]]
+        self.assertEqual(source["type"], "LoadImage")
+
+        mosaic = next(
+            node for node in graph["nodes"] if node["type"] == "WanAutoMosaicVideo"
+        )
+        mosaic_input = by_id[links[mosaic["inputs"][0]["link"]][1]]
+        self.assertEqual(mosaic_input["type"], "RIFE VFI")
+        combine = next(
+            node for node in graph["nodes"] if node["type"] == "VHS_VideoCombine"
+        )
+        combine_image = next(
+            item for item in combine["inputs"] if item["name"] == "images"
+        )
+        self.assertEqual(links[combine_image["link"]][1:3], [mosaic["id"], 0])
+        self.assertIn("i2v-mosaic", combine["widgets_values"]["filename_prefix"])
+
+        self.assertEqual(by_id[208]["properties"]["valueX"], 528)
+        self.assertEqual(by_id[208]["properties"]["valueY"], 704)
+        self.assertEqual(by_id[178]["widgets_values"], [5])
+        self.assertEqual(
+            graph["extra"]["runpod_bundle"]["preset"], "i2v-auto-mosaic"
+        )
+
+        def rect(item, key):
+            x, y, width, height = map(float, item[key])
+            return (x, y, x + width, y + height)
+
+        def node_rect(node):
+            x, y = map(float, node["pos"])
+            width, height = map(float, node.get("size", [220, 80])[:2])
+            return (x, y, x + width, y + height)
+
+        def overlaps(first, second):
+            return (
+                min(first[2], second[2]) - max(first[0], second[0]) > 0.01
+                and min(first[3], second[3]) - max(first[1], second[1]) > 0.01
+            )
+
+        for index, first in enumerate(graph["nodes"]):
+            for second in graph["nodes"][index + 1 :]:
+                self.assertFalse(
+                    overlaps(node_rect(first), node_rect(second)),
+                    f"normal I2V nodes {first['id']} and {second['id']} overlap",
+                )
+        child_groups = [group for group in graph["groups"] if group["id"] != 34]
+        for index, first in enumerate(child_groups):
+            for second in child_groups[index + 1 :]:
+                self.assertFalse(
+                    overlaps(rect(first, "bounding"), rect(second, "bounding")),
+                    f"normal I2V groups {first['id']} and {second['id']} overlap",
+                )
+
+    def test_normal_i2v_mosaic_exposes_throat_v3_high_low_pair(self):
+        graph = self.load(I2V_MOSAIC)
+        entries = {
+            item["lora"]: (item["strength"], item["on"])
+            for node in graph["nodes"]
+            if node["type"] == "Power Lora Loader (rgthree)"
+            for item in node["widgets_values"]
+            if isinstance(item, dict)
+            and item.get("lora", "").startswith("Wan22_ThroatV3_")
+        }
+        self.assertEqual(
+            entries,
+            {
+                "Wan22_ThroatV3_High.safetensors": (1.0, False),
+                "Wan22_ThroatV3_Low.safetensors": (1.0, False),
+            },
+        )
 
     def test_loop_variants_use_nmkd_model_upscale_at_net_two_x(self):
         for path in LOOP_WORKFLOWS:
