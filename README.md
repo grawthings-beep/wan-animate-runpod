@@ -13,7 +13,7 @@ WAN 2.2 Smooth v6のシームレスループを、RunPodで毎回クリーンに
 
 本番では可変tagではなく、GitHub Actionsが発行する40文字commit付きtagを使います。GPUとimageを間違えた場合、またはCUDA 13に必要な580未満のdriver hostへ割り当てられた場合は、46 GBを取る前に明示的に停止します。
 
-Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ入れると、モデル1本の変更でも巨大layerのpull・展開・registry cacheが発生し、今回の「Network Volumeなし・毎回新規取得」では不利だからです。
+Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ入れると、モデル1本の変更でも巨大layerのpull・展開・registry cacheが発生し、今回の「Network Volumeなし・毎回新規取得」では不利だからです。大容量のSmoothMix本体は、SHA-256が一致するrevision固定済みHugging Face sourceを複数登録し、一次配布先の削除・404時には同じ`.part`を保ったままmirrorへ自動failoverします。
 
 ## Model profile
 
@@ -52,7 +52,7 @@ auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後�
   -> GPU / image / driver / Torch実演算検査
   -> workflow配置
   -> disk容量検査
-  -> 大きいモデルから4本並列取得（HF Xet + aria2）
+  -> 大きいモデルから4本並列取得（HF Xet + aria2 + 同一SHA mirror failover）
   -> SHA-256・custom node・CUDA検査
   -> 同じ8188をComfyUIへhandoff
 ```

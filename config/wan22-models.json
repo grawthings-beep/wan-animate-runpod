@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "default_profile": "loop-all",
   "profiles": {
     "full": {
@@ -72,7 +72,8 @@
     {
       "name": "SmoothMix WAN 2.2 I2V v2 High",
       "group": "i2v",
-      "url": "https://huggingface.co/DasCaptain/nsfw_models/resolve/main/smoothMixWan2214BI2V_i2vV20High.safetensors",
+      "url": "https://huggingface.co/Babaladen/SmoothMIX/resolve/ea1ee4affd2de75bee41d9f0b200f0797cb58bbd/smoothMixWan2214BI2V_i2vV20High.safetensors",
+      "mirrors": ["https://huggingface.co/landon2022/smooth_mix_v2/resolve/c171341f70a06582771d74c04171a036b479ba12/smoothMixWan2214BI2V_i2vV20High.safetensors"],
       "path": "models/diffusion_models/smoothMixWan2214BI2V_i2vV20High.safetensors",
       "size_bytes": 14550099704,
       "sha256": "1f40184ebd858b179d71fdcfa9c1ebc5cb79fa7ae90474c5ba44ce8abe5e9bc3"
@@ -80,7 +81,8 @@
     {
       "name": "SmoothMix WAN 2.2 I2V v2 Low",
       "group": "i2v",
-      "url": "https://huggingface.co/DasCaptain/nsfw_models/resolve/main/smoothMixWan2214BI2V_i2vV20Low.safetensors",
+      "url": "https://huggingface.co/Babaladen/SmoothMIX/resolve/ea1ee4affd2de75bee41d9f0b200f0797cb58bbd/smoothMixWan2214BI2V_i2vV20Low.safetensors",
+      "mirrors": ["https://huggingface.co/landon2022/smooth_mix_v2/resolve/c171341f70a06582771d74c04171a036b479ba12/smoothMixWan2214BI2V_i2vV20Low.safetensors"],
       "path": "models/diffusion_models/smoothMixWan2214BI2V_i2vV20Low.safetensors",
       "size_bytes": 14550099768,
       "sha256": "5de2d526f4349834c36f06972f610997edfcbc896cdc4211362daea6b643b125"

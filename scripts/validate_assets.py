@@ -94,6 +94,20 @@ def validate_manifest(manifest, errors):
         else:
             if urlparse(entry.get("url", "")).scheme != "https":
                 errors.append(f"{label}: URL must use HTTPS")
+            mirrors = entry.get("mirrors") or []
+            if not isinstance(mirrors, list):
+                errors.append(f"{label}: mirrors must be a list")
+                mirrors = []
+            for mirror_index, mirror in enumerate(mirrors):
+                if not isinstance(mirror, str) or urlparse(mirror).scheme != "https":
+                    errors.append(
+                        f"{label}: mirrors[{mirror_index}] must use HTTPS"
+                    )
+            sources = [entry.get("url"), *mirrors]
+            if all(isinstance(source, str) for source in sources) and len(
+                sources
+            ) != len(set(sources)):
+                errors.append(f"{label}: duplicate download source")
             sha = entry.get("sha256", "")
             if not re.fullmatch(r"[0-9a-fA-F]{64}", sha):
                 errors.append(f"{label}: invalid SHA256")

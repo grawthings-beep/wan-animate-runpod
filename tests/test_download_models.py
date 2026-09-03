@@ -84,6 +84,65 @@ class DownloadModelsTests(unittest.TestCase):
             ("org/repo", "main", "model (2).safetensors"),
         )
 
+    def test_download_sources_are_unique_and_primary_first(self):
+        self.assertEqual(
+            DOWNLOAD_MODELS.download_urls(
+                {
+                    "url": "https://primary.example/model.bin",
+                    "mirrors": [
+                        "https://mirror.example/model.bin",
+                        "https://primary.example/model.bin",
+                    ],
+                }
+            ),
+            [
+                "https://primary.example/model.bin",
+                "https://mirror.example/model.bin",
+            ],
+        )
+
+    def test_download_file_fails_over_to_verified_mirror(self):
+        payload = b"verified mirror payload"
+        entry = {
+            "name": "mirrored model",
+            "url": "https://primary.example/model.bin",
+            "mirrors": ["https://mirror.example/model.bin"],
+            "path": "models/model.bin",
+            "size_bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        }
+
+        def resolve(url, _headers):
+            if "primary" in url:
+                raise RuntimeError("HTTP 404")
+            return url
+
+        def write_payload(_url, part):
+            part.parent.mkdir(parents=True, exist_ok=True)
+            part.write_bytes(payload)
+
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            DOWNLOAD_MODELS, "resolve_download_url", side_effect=resolve
+        ), mock.patch.object(
+            DOWNLOAD_MODELS.shutil, "which", return_value="/usr/bin/curl"
+        ), mock.patch.object(
+            DOWNLOAD_MODELS,
+            "run_curl",
+            side_effect=write_payload,
+        ):
+            DOWNLOAD_MODELS.download_file(
+                entry,
+                pathlib.Path(directory),
+                use_aria2=False,
+                connections=1,
+                splits=1,
+                dry_run=False,
+                prefer_hf_xet=False,
+            )
+            output = pathlib.Path(directory) / entry["path"]
+            self.assertEqual(output.read_bytes(), payload)
+            self.assertTrue(DOWNLOAD_MODELS.marker_path(output).is_file())
+
     def test_largest_files_are_scheduled_first(self):
         entries = [
             {"name": "small", "size_bytes": 1},
@@ -218,6 +277,7 @@ class DownloadModelsTests(unittest.TestCase):
         )
         self.assertFalse(any(name.startswith("mmaudio_") for name in selected))
         self.assertFalse(any(name.endswith(".gguf") for name in selected))
+
         self.assertTrue(
             {"NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"}.issubset(
                 selected
@@ -264,6 +324,40 @@ class DownloadModelsTests(unittest.TestCase):
                 "paizuri_unaligned_breasts_wanvideo_i2v_epoch5.safetensors",
                 "washizukami_wanvideo_i2v.safetensors",
             }.issubset(selected)
+        )
+
+    def test_smoothmix_i2v_has_pinned_verified_failover_sources(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
+        )
+        entries = [entry for entry in manifest["models"] if entry["group"] == "i2v"]
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(
+            {entry["sha256"] for entry in entries},
+            {
+                "1f40184ebd858b179d71fdcfa9c1ebc5cb79fa7ae90474c5ba44ce8abe5e9bc3",
+                "5de2d526f4349834c36f06972f610997edfcbc896cdc4211362daea6b643b125",
+            },
+        )
+        self.assertTrue(
+            all(
+                entry["url"].startswith(
+                    "https://huggingface.co/Babaladen/SmoothMIX/resolve/"
+                    "ea1ee4affd2de75bee41d9f0b200f0797cb58bbd/"
+                )
+                for entry in entries
+            )
+        )
+        self.assertTrue(
+            all(
+                entry["mirrors"][0].startswith(
+                    "https://huggingface.co/landon2022/smooth_mix_v2/resolve/"
+                    "c171341f70a06582771d74c04171a036b479ba12/"
+                )
+                for entry in entries
+            )
         )
 
     def test_loop_xxx_loras_use_hugging_face_backup(self):

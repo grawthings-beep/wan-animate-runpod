@@ -296,6 +296,59 @@ def run_hf_xet(url, part):
     materialize_cached_file(cached_path, part)
 
 
+def download_urls(entry):
+    """Return the primary source followed by unique failover mirrors."""
+    mirrors = entry.get("mirrors") or []
+    if not isinstance(mirrors, list):
+        raise ValueError("mirrors must be a list")
+    urls = [entry.get("url"), *mirrors]
+    return list(
+        dict.fromkeys(url.strip() for url in urls if isinstance(url, str) and url.strip())
+    )
+
+
+def transfer_file_source(
+    url,
+    entry,
+    part,
+    use_aria2,
+    connections,
+    splits,
+    prefer_hf_xet,
+    name,
+):
+    """Transfer one source while preserving a resumable partial for mirrors."""
+    if has_unresolved_template(url):
+        raise RuntimeError(f"unresolved environment template in URL for {name}")
+
+    headers = cleaned_headers(entry.get("headers"))
+    request_url = add_auth_query(
+        url,
+        entry.get("auth_query_env"),
+        entry.get("auth_query_name", "token"),
+    )
+    use_existing_partial = part.is_file() and part.stat().st_size > 0
+    hub_coordinates = parse_huggingface_url(url)
+    if prefer_hf_xet and hub_coordinates and not use_existing_partial:
+        try:
+            print(f"HF_XET: {name}")
+            run_hf_xet(url, part)
+            return
+        except Exception as exc:
+            print(
+                f"WARN hf_xet failed for {name}; falling back to aria2: {exc}",
+                file=sys.stderr,
+            )
+
+    final_url = resolve_download_url(request_url, headers)
+    if use_aria2 and shutil.which("aria2c"):
+        run_aria2(final_url, part, connections, splits)
+    elif shutil.which("curl"):
+        run_curl(final_url, part)
+    else:
+        run_urllib(final_url, part)
+
+
 def extract_archive(archive, destination, selector):
     selector = str(selector).strip().lower()
     extensions = None
@@ -407,79 +460,76 @@ def download_file(
     if verified.exists():
         verified.unlink()
 
-    headers = cleaned_headers(entry.get("headers"))
-    url = entry["url"]
-    if has_unresolved_template(url):
-        raise RuntimeError(f"unresolved environment template in URL for {name}")
-    request_url = add_auth_query(
-        url,
-        entry.get("auth_query_env"),
-        entry.get("auth_query_name", "token"),
-    )
-
     part = output.with_name(f"{output.name}.part")
-    try:
-        print(f"DOWNLOAD: {name}")
-        # Preserve old aria2 partials across image upgrades. New Hub downloads
-        # use hf_xet, whose Rust backend adapts concurrency to the link.
-        use_existing_partial = part.is_file() and part.stat().st_size > 0
-        hub_coordinates = parse_huggingface_url(url)
-        if prefer_hf_xet and hub_coordinates and not use_existing_partial:
-            try:
-                print(f"HF_XET: {name}")
-                run_hf_xet(url, part)
-            except Exception as exc:
-                print(
-                    f"WARN hf_xet failed for {name}; falling back to aria2: {exc}",
-                    file=sys.stderr,
-                )
-                final_url = resolve_download_url(request_url, headers)
-                if use_aria2 and shutil.which("aria2c"):
-                    run_aria2(final_url, part, connections, splits)
-                elif shutil.which("curl"):
-                    run_curl(final_url, part)
-                else:
-                    run_urllib(final_url, part)
-        elif use_aria2 and shutil.which("aria2c"):
-            final_url = resolve_download_url(request_url, headers)
-            run_aria2(final_url, part, connections, splits)
-        elif shutil.which("curl"):
-            final_url = resolve_download_url(request_url, headers)
-            run_curl(final_url, part)
-        else:
-            final_url = resolve_download_url(request_url, headers)
-            run_urllib(final_url, part)
+    urls = download_urls(entry)
+    if not urls:
+        raise RuntimeError(f"no download source configured for {name}")
 
-        actual_size = part.stat().st_size
-        if expected_size and actual_size != expected_size:
-            raise RuntimeError(
-                f"size mismatch for {name}: expected {expected_size}, got {actual_size}"
+    print(f"DOWNLOAD: {name}")
+    source_errors = []
+    for source_index, url in enumerate(urls, start=1):
+        if len(urls) > 1:
+            print(f"SOURCE {source_index}/{len(urls)}: {name}")
+        try:
+            # Preserve old aria2 partials across image upgrades. New Hub
+            # downloads use hf_xet, whose Rust backend adapts concurrency.
+            transfer_file_source(
+                url,
+                entry,
+                part,
+                use_aria2,
+                connections,
+                splits,
+                prefer_hf_xet,
+                name,
             )
-        if actual_size < min_bytes:
-            raise RuntimeError(f"downloaded file is too small for {name}: {actual_size}")
-        if expected_sha:
-            actual_sha = sha256_file(part)
-            if actual_sha != expected_sha:
+
+            actual_size = part.stat().st_size
+            if expected_size and actual_size != expected_size:
                 part.unlink(missing_ok=True)
                 raise RuntimeError(
-                    f"SHA256 mismatch for {name}: expected {expected_sha}, got {actual_sha}"
+                    f"size mismatch for {name}: expected {expected_size}, got {actual_size}"
                 )
+            if actual_size < min_bytes:
+                part.unlink(missing_ok=True)
+                raise RuntimeError(
+                    f"downloaded file is too small for {name}: {actual_size}"
+                )
+            if expected_sha:
+                actual_sha = sha256_file(part)
+                if actual_sha != expected_sha:
+                    part.unlink(missing_ok=True)
+                    raise RuntimeError(
+                        f"SHA256 mismatch for {name}: expected {expected_sha}, got {actual_sha}"
+                    )
+            part.replace(output)
+            break
+        except Exception as exc:
+            source_errors.append(f"source {source_index}: {exc}")
+            if source_index < len(urls):
+                print(
+                    f"WARN source {source_index}/{len(urls)} failed for {name}; "
+                    "trying mirror",
+                    file=sys.stderr,
+                )
+    else:
+        # Keep resumable transport partials. Size/hash mismatches are deleted
+        # above because they must never contaminate the next mirror attempt.
+        raise RuntimeError(
+            f"all {len(urls)} download sources failed for {name}: "
+            + " | ".join(source_errors)
+        )
 
-        part.replace(output)
-        if entry.get("extract"):
-            extracted = extract_archive(output, output.parent, entry["extract"])
-            sentinel = output.parent / f".{output.name}.extracted.json"
-            sentinel.write_text(
-                json.dumps([path.name for path in extracted], sort_keys=True),
-                encoding="utf-8",
-            )
-            print(f"EXTRACTED: {', '.join(path.name for path in extracted)}")
-        else:
-            write_marker(output, expected_sha, actual_size)
-    except Exception:
-        # Keep a partial aria2 download so a pod restart can resume it. A bad
-        # checksum is explicitly deleted above.
-        raise
+    if entry.get("extract"):
+        extracted = extract_archive(output, output.parent, entry["extract"])
+        sentinel = output.parent / f".{output.name}.extracted.json"
+        sentinel.write_text(
+            json.dumps([path.name for path in extracted], sort_keys=True),
+            encoding="utf-8",
+        )
+        print(f"EXTRACTED: {', '.join(path.name for path in extracted)}")
+    else:
+        write_marker(output, expected_sha, actual_size)
 
 
 def selected_groups(manifest, profile):
