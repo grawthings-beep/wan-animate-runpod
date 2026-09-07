@@ -29,11 +29,17 @@ Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ�
 
 | profile | assets | download | 内容 |
 |---|---:|---:|---|
-| `loop-core` | 12 | 41.27 GB | Enhanced V2 Q8、NSFW-22/SmoothXXXAnimationの2組（OFF）、encoder、VAE、RIFE、モザイク検出器、NMKD-Siax |
-| `loop-all` | 28 | 47.05 GB | coreと従来の追加LoRA全組（OFF）。外付けLightX2Vは不要 |
-| `loop-quality` | 28 | 47.05 GB | 旧設定互換の`loop-all` alias |
+| `loop-core` | 13 | 41.58 GB | Enhanced V2 Q8、NSFW-22/SmoothXXXAnimationの2組＋wind（OFF）、encoder、VAE、RIFE、モザイク検出器、NMKD-Siax |
+| `loop-all` | 29 | 47.36 GB | coreと従来の追加LoRA全組（OFF）。外付けLightX2Vは不要 |
+| `loop-quality` | 29 | 47.36 GB | 旧設定互換の`loop-all` alias |
 
-追加LoRAを2組に絞るなら`MODEL_PROFILE=loop-core`、手持ち全組を選びたいなら`loop-all`です。core workflowにはprofile外のLoRA行を置かないため、意図的に省いたモデルの不足警告を防ぎます。
+追加LoRAを2組＋windに絞るなら`MODEL_PROFILE=loop-core`、手持ち全組を選びたいなら`loop-all`です。core workflowにはprofile外のLoRA行を置かないため、意図的に省いたモデルの不足警告を防ぎます。
+
+### Wind motion LoRA
+
+[作者版 v1.0](https://civitai.com/models/1865813?modelVersionId=2111773)の`wind.safetensors`を追加しています。Low-noise学習の単体LoRAなので、全8本のloop派生と通常I2V版では**LOW LORA LOADERだけに1行、1.0 / OFF**で配置。試すときはこの行をONにします。1.0は編集可能な初期値であり、作者推奨の最適値ではありません。High側へ同名ファイルを自動追加しません。
+
+HF上のファイル名は`lownoise.safetensors`ですが、作者版と同一SHA-256を確認した固定revisionから取得し、ComfyUIには`models/loras/wind.safetensors`として配置します。約307 MB、追加Secretやcustom nodeは不要。HF Xet優先・aria2 fallback・ダウンロード後SHA-256検証を既存の経路で行います。固有トリガーの登録はありません。Enhanced V2での生成品質とループの継ぎ目は実GPUでの確認が必要です。
 
 loop系はLanczos拡大ではなく、デコードした各フレームを`4x_NMKD-Siax_200k`で4倍AIアップスケールしてから`nearest-exact`で0.5倍へ戻すため、最終サイズは従来どおり実質2倍です。標準のComfyUIノードだけを使い、追加ダウンロードは約67 MBです。
 
@@ -86,7 +92,7 @@ auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後�
 
 mainへのpushごとに以下を実行します。
 
-- 11 workflowの再生成差分と57 asset manifestの整合検査
+- 11 workflowの再生成差分と58 asset manifestの整合検査
 - Python unit tests、JavaScript構文、shell構文
 - Ada/cu128とBlackwell/cu130を2 job並列build
 - 各image内で本番`start.sh`を`--quick-test-for-ci`実行し、custom node import、CLI、writable user/workflow pathを検査

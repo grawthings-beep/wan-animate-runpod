@@ -107,6 +107,11 @@ ENHANCED_GUIDE = (
     "GGUF supports LoRA loading, but matching the WAN architecture does not "
     "guarantee visual compatibility. Compare a single matching pair against "
     "the LoRA-free baseline with a fixed seed.\n\n"
+    "wind.safetensors is a single Low-trained motion LoRA, not a High/Low "
+    "pair. It is available in the LOW loader at 1.0 / OFF. Enable that row "
+    "to try it; 1.0 is an editable placeholder, not an author-recommended "
+    "optimum. No dedicated trigger word is registered. Loop seam quality "
+    "and compatibility with Enhanced V2 still require generation tests.\n\n"
     "This preset uses ordinary KSamplerAdvanced, without NAG. At CFG 1 the "
     "negative prompt has no effect. Avoid assuming stronger negative text "
     "will change the result. Base size: 528 x 704.\n\n"
@@ -686,6 +691,7 @@ def patch_loop(aio):
         [
             lora("NSFW-22-L-e8.safetensors", 1.0),
             lora("SmoothXXXAnimation_Low.safetensors", 1.0),
+            lora("wind.safetensors", 1.0),
             lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
             lora("I2V_joi_trend_low.safetensors", 1.0),
             lora("Wan22_ThroatV3_Low.safetensors", 1.0),
@@ -872,6 +878,7 @@ def patch_i2v(aio):
         [
             lora("NSFW-22-L-e8.safetensors", 1.0),
             lora("SmoothXXXAnimation_Low.safetensors", 1.0),
+            lora("wind.safetensors", 1.0),
             lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
             lora("I2V_joi_trend_low.safetensors", 1.0),
             lora("Wan22_ThroatV3_Low.safetensors", 1.0),
@@ -921,7 +928,7 @@ def patch_i2v(aio):
 
 
 def patch_loop_core(loop):
-    """Keep the two existing small optional pairs, without enabling them."""
+    """Keep the two optional pairs and single wind LoRA, all disabled."""
     graph = copy.deepcopy(loop)
     for node in graph.get("nodes", []):
         if node.get("type") != "Power Lora Loader (rgthree)":
@@ -929,8 +936,9 @@ def patch_loop_core(loop):
         retained = [
             copy.deepcopy(item)
             for item in node.get("widgets_values", [])
-            if isinstance(item, dict) and item.get("lora", "").startswith(
-                ("NSFW-22-", "SmoothXXXAnimation_")
+            if isinstance(item, dict) and (
+                item.get("lora", "").startswith(("NSFW-22-", "SmoothXXXAnimation_"))
+                or item.get("lora") == "wind.safetensors"
             )
         ]
         configure_lora_node(node, retained)
@@ -941,7 +949,8 @@ def patch_loop_core(loop):
         note["widgets_values"] = (
             "LOOP CORE PRESET\n\n"
             "Only the optional NSFW-22 and SmoothXXXAnimation High/Low pairs "
-            "are present, both OFF by default. The other optional LoRAs are "
+            "and the single LOW wind LoRA are present, all OFF by default. "
+            "The other optional LoRAs are "
             "omitted from this core canvas and its download profile. "
             "Use the non-core workflow with MODEL_PROFILE=loop-all when those "
             "optional effects are needed.\n\n"

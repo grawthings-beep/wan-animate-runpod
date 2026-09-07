@@ -252,6 +252,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "enhanced-i2v",
                 "loop-nsfw-loras",
                 "loop-xxx-loras",
+                "loop-wind-lora",
                 "loop-cumshot-loras",
                 "loop-joi-loras",
                 "loop-throat-loras",
@@ -267,7 +268,8 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 28)
+        self.assertEqual(len(selected), 29)
+        self.assertIn("wind.safetensors", selected)
         self.assertIn("4x_NMKD-Siax_200k.pth", selected)
         self.assertIn("animeNSFWDetection_v50.zip", selected)
         self.assertNotIn(
@@ -385,6 +387,26 @@ class DownloadModelsTests(unittest.TestCase):
             ))
             self.assertFalse(entry.get("requires_env"))
         self.assertEqual(manifest["profiles"]["loop-quality"]["include_groups"], manifest["profiles"]["loop-all"]["include_groups"])
+
+    def test_wind_lora_is_verified_pinned_and_available_to_every_loop_profile(self):
+        import json
+
+        manifest = json.loads((ROOT / "config/wan22-models.json").read_text(encoding="utf-8"))
+        entries = [entry for entry in manifest["models"] if entry["group"] == "loop-wind-lora"]
+        self.assertEqual(len(entries), 1)
+        entry = entries[0]
+        self.assertEqual(entry["path"], "models/loras/wind.safetensors")
+        self.assertEqual(entry["size_bytes"], 306807976)
+        self.assertEqual(entry["sha256"], "bc63d236c02fa53623a1b5b134975e2aed829afabaafaa06783a20c7a37222f9")
+        self.assertEqual(entry["source_url"], "https://civitai.com/api/download/models/2111773?fileId=2006379")
+        self.assertEqual(DOWNLOAD_MODELS.parse_huggingface_url(entry["url"]), (
+            "NikolaSigmoid/wan2.2-i2v-loras-wind",
+            "9fd342a5b972bf669475eef3f29ad979cef17795",
+            "lownoise.safetensors",
+        ))
+        self.assertFalse(entry.get("requires_env"))
+        for profile in ("loop-core", "loop-all", "loop-quality", "full"):
+            self.assertIn("loop-wind-lora", DOWNLOAD_MODELS.selected_groups(manifest, profile))
 
     def test_loop_xxx_loras_use_hugging_face_backup(self):
         import json
@@ -605,6 +627,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "enhanced-i2v",
                 "loop-nsfw-loras",
                 "loop-xxx-loras",
+                "loop-wind-lora",
                 "rife49",
                 "auto-mosaic",
                 "upscale-nmkd",

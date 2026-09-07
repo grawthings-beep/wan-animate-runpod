@@ -4,23 +4,23 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "auto-mosaic", "upscale-nmkd", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-wind-lora", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "auto-mosaic", "upscale-nmkd", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
     "loop-core": {
-      "description": "Enhanced V2 Q8 Lightning-built-in loop pack with two optional High/Low LoRA pairs (OFF by default), encoders, VAE, RIFE, CPU mosaic, and AI upscaler. No external Lightning/LightX2V is required.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
+      "description": "Enhanced V2 Q8 Lightning-built-in loop pack with two optional High/Low LoRA pairs and the Low-trained wind LoRA (all OFF by default), encoders, VAE, RIFE, CPU mosaic, and AI upscaler. No external Lightning/LightX2V is required.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-wind-lora", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "loop-all": {
       "description": "Complete seamless-loop pack. Adds Cumshot Aesthetics, JOI Handjob Trend, Deepthroat/Face Fuck v3, and all five iroiroLoRA High/Low pairs to loop-core for optional manual use.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-wind-lora", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "loop-quality": {
       "description": "Deprecated compatibility alias for loop-all. New templates should use loop-core or loop-all.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-wind-lora", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -112,6 +112,15 @@
       "path": "models/loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
       "size_bytes": 1466506280,
       "sha256": "5c324ada09cfa447844f5d9a57240463a515de38270ef40c7513d74be3e64e72"
+    },
+    {
+      "name": "WAN 2.2 wind skirt motion v1.0 (Low-noise trained)",
+      "group": "loop-wind-lora",
+      "url": "https://huggingface.co/NikolaSigmoid/wan2.2-i2v-loras-wind/resolve/9fd342a5b972bf669475eef3f29ad979cef17795/lownoise.safetensors",
+      "path": "models/loras/wind.safetensors",
+      "size_bytes": 306807976,
+      "sha256": "bc63d236c02fa53623a1b5b134975e2aed829afabaafaa06783a20c7a37222f9",
+      "source_url": "https://civitai.com/api/download/models/2111773?fileId=2006379"
     },
     {
       "name": "WAN 2.2 General NSFW v0.08a High",

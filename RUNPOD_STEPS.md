@@ -79,7 +79,7 @@ CIVITAI_API_TOKEN={{ RUNPOD_SECRET_CIVITAI_TOKEN }}
 HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
 ```
 
-追加LoRAの選択肢をNSFW-22とSmoothXXXAnimationの2組（初期値OFF）に絞るなら、次の1行だけ変更します。
+追加LoRAの選択肢をNSFW-22とSmoothXXXAnimationの2組＋wind（初期値OFF）に絞るなら、次の1行だけ変更します。
 
 ```text
 MODEL_PROFILE=loop-core
@@ -100,7 +100,7 @@ cuda-preflight -> workflows -> models -> validation -> ready -> ComfyUI
 ```text
 [gpu-preflight] TORCH STACK READY
 [gpu-preflight] READY
-MODEL PROFILE: loop-all (28 assets)
+MODEL PROFILE: loop-all (29 assets)
 TRANSFER ENGINE: 4 files in parallel
 [check_env] ... required_missing=0
 BOOT PHASE: comfyui-exec
@@ -116,16 +116,20 @@ Edgeだけ403になりChromeでは開く場合、RunPod proxy自体ではなくE
 
 1. `1. SELECT START IMAGE`へ開始画像を1枚入れます。
 2. positive promptへ開始から終了までの動作を時系列で書きます。開始姿勢へ戻す指示は不要です。
-3. 必要なLoRAはHigh／Lowの対応する2行を両方ONにします。Deepthroat/Face Fuck v3は`Wan22_ThroatV3_High`と`Wan22_ThroatV3_Low`です。
+3. ペアで配布されたLoRAはHigh／Lowの対応する2行を両方ONにします。単体の`wind.safetensors`はLow行だけをONにします。
 4. Queueすると、通常I2V、AIアップスケール、RIFE、自動モザイク、MP4保存の順に1本だけ実行されます。
 
-このworkflowは`MODEL_PROFILE=loop-all`の28 assetをそのまま利用するため、上記の環境変数を変更する必要はありません。モザイク対象は既定で`pussy,penis,testicles`、`anus`は除外です。
+このworkflowは`MODEL_PROFILE=loop-all`の29 assetをそのまま利用するため、上記の環境変数を変更する必要はありません。モザイク対象は既定で`pussy,penis,testicles`、`anus`は除外です。
 
 ## Enhanced V2 Q8の初回確認
 
 新しいSHA imageを使い、同梱workflowを開き直します。モデル欄が`ENHANCED V2 Q8`のHigh/Low、samplerが両方`KSamplerAdvanced`、全LoRAがOFFなら新presetです。古いJSONのモデル名だけを変えるとGGUFを読み込めません。
 
 設定は両samplerで`steps=5 / cfg=1 / euler / simple`、High `start=0 / end=2`、Low `start=2 / end=5`。LightX2V/Lightningは追加しません。CFG 1ではnegative promptは無効です。ループは同一画像を両端に指定する仕組みを継続し、batch10では自動で同一画像が配線されます。
+
+## Wind motion LoRAの使用
+
+`wind.safetensors`を試す場合は、同梱workflowを開き直して**LOW LORA LOADERのwind行をON**にします（初期値1.0 / OFF）。High/LowペアではなくLow側で学習された単体LoRAです。通常ループ・batch10・モザイク版・core版すべてに配置済みで、既存の環境変数のまま自動取得されます。batch10ではこのLoRA設定が10本に共通で適用されます。
 
 ## Batch10の一括投入
 

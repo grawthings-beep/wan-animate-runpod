@@ -168,7 +168,7 @@ class WorkflowWiringTests(unittest.TestCase):
             for item in node["widgets_values"]
             if isinstance(item, dict) and item.get("lora")
         ]
-        self.assertEqual(len(entries), 20)
+        self.assertEqual(len(entries), 21)
         self.assertEqual(
             {item["lora"] for item in entries},
             {
@@ -176,6 +176,7 @@ class WorkflowWiringTests(unittest.TestCase):
                 "NSFW-22-L-e8.safetensors",
                 "SmoothXXXAnimation_High.safetensors",
                 "SmoothXXXAnimation_Low.safetensors",
+                "wind.safetensors",
                 "Cumshot_Aesthetics_High.safetensors",
                 "Cumshot_Aesthetics_Low.safetensors",
                 "I2V_joi_trend_high.safetensors",
@@ -742,7 +743,24 @@ class WorkflowWiringTests(unittest.TestCase):
                             f"groups {first['id']} and {second['id']} overlap",
                         )
 
-    def test_core_variants_keep_two_optional_pairs_off(self):
+    def test_wind_is_a_single_low_only_row_in_every_production_workflow(self):
+        for path in (*LOOP_WORKFLOWS, I2V_MOSAIC):
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                low_id = 200 if path == I2V_MOSAIC else 324
+                wind_rows = [
+                    (node["id"], item["strength"], item["on"])
+                    for node in graph["nodes"]
+                    if node["type"] == "Power Lora Loader (rgthree)"
+                    for item in node["widgets_values"]
+                    if isinstance(item, dict) and item.get("lora") == "wind.safetensors"
+                ]
+                self.assertEqual(wind_rows, [(low_id, 1.0, False)])
+                notes = [str(node.get("widgets_values", "")) for node in graph["nodes"]
+                         if node["type"] in ("Note", "Note Plus (mtb)")]
+                self.assertTrue(any("single Low-trained motion LoRA" in note for note in notes))
+
+    def test_core_variants_keep_two_optional_pairs_and_wind_off(self):
         for path in CORE_WORKFLOWS:
             with self.subTest(path=path.name):
                 graph = self.load(path)
@@ -753,7 +771,12 @@ class WorkflowWiringTests(unittest.TestCase):
                     for item in node["widgets_values"]
                     if isinstance(item, dict) and item.get("lora")
                 ]
-                self.assertEqual(len(entries), 4)
+                self.assertEqual({item["lora"] for item in entries}, {
+                    "NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors",
+                    "SmoothXXXAnimation_High.safetensors", "SmoothXXXAnimation_Low.safetensors",
+                    "wind.safetensors",
+                })
+                self.assertEqual(len(entries), 5)
                 self.assertTrue(all(item["on"] is False for item in entries))
                 self.assertEqual(
                     graph["extra"]["runpod_bundle"]["profile"], "loop-core"
