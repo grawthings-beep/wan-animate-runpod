@@ -62,6 +62,7 @@
     "VHS_VideoCombine": "ComfyUI-VideoHelperSuite",
     "VHS_VideoInfo": "ComfyUI-VideoHelperSuite",
     "WanAutoMosaicVideo": "ComfyUI-WanLoopBatch",
+    "WanLoopModelUpscale": "ComfyUI-WanLoopBatch",
     "WanLoopBatchFinalize": "ComfyUI-WanLoopBatch",
     "WanLoopQueueSelector": "ComfyUI-WanLoopBatch",
     "WanLoopQueueSlot": "ComfyUI-WanLoopBatch",

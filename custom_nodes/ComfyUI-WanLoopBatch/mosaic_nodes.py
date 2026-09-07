@@ -1,10 +1,11 @@
-"""CPU-only contour auto-mosaic for completed ComfyUI video frames."""
+"""Per-frame contour auto-mosaic, after generation, with bounded GPU use."""
 
 from __future__ import annotations
 
 import os
 import pathlib
 import threading
+import time
 
 import folder_paths
 import numpy as np
@@ -70,6 +71,25 @@ def _load_model(model_name: str):
             _MODEL = YOLO(str(model_path), task="segment")
             _MODEL_PATH = model_path
     return _MODEL
+
+
+def _inference_device(requested):
+    if requested not in ("auto", "cpu"):
+        raise ValueError("mosaic device must be auto or cpu")
+    if requested == "cpu":
+        return "cpu"
+    import torch
+    if not torch.cuda.is_available():
+        return "cpu"
+    from comfy import model_management
+    # This node executes only after WAN/upscale/RIFE, not alongside sampling.
+    model_management.unload_all_models()
+    model_management.soft_empty_cache()
+    device = model_management.get_torch_device()
+    if device.type != "cuda":
+        return "cpu"
+    free, _total = torch.cuda.mem_get_info(device)
+    return str(device) if free >= 2 * 1024 ** 3 else "cpu"
 
 
 def _selected_class_ids(names, requested: str) -> list[int]:
@@ -319,6 +339,7 @@ class WanAutoMosaicVideo:
                     "STRING",
                     {"default": DEFAULT_CLASSES, "multiline": False},
                 ),
+                "device": (["auto", "cpu"], {"default": "auto"}),
             }
         }
 
@@ -332,8 +353,12 @@ class WanAutoMosaicVideo:
         block_size,
         max_gap_frames,
         target_classes,
+        device="cpu",
     ):
         import torch
+        from comfy import model_management
+
+        started = time.perf_counter()
 
         if images.ndim != 4 or images.shape[-1] < 3:
             raise ValueError("Auto mosaic expects IMAGE shaped [frames, H, W, C].")
@@ -342,42 +367,58 @@ class WanAutoMosaicVideo:
         class_ids = _selected_class_ids(model.names, target_classes)
         _frame_count, height, width, _channels = images.shape
         frame_masks = []
+        inference_device = _inference_device(device)
+        print(f"[wan-post] mosaic detection device={inference_device} frames={len(images)}")
 
-        # Explicitly run on CPU. WAN and RIFE keep exclusive use of GPU VRAM.
-        for frame in images:
-            rgb = (
-                frame[..., :3]
-                .detach()
-                .to(device="cpu", dtype=torch.float32)
-                .clamp(0.0, 1.0)
-                .numpy()
-            )
-            bgr = np.ascontiguousarray(
-                (rgb[:, :, ::-1] * 255.0).round().astype(np.uint8)
-            )
-            result = model.predict(
-                source=bgr,
-                imgsz=640,
-                conf=float(confidence),
-                iou=float(iou_threshold),
-                classes=class_ids,
-                max_det=24,
-                retina_masks=True,
-                device="cpu",
-                half=False,
-                verbose=False,
-            )[0]
-            frame_masks.append(
-                _segmentation_union(
-                    result, int(height), int(width), str(coverage_preset)
+        # Inspect EVERY frame, including interpolated ones. Never trade away
+        # coverage by detecting only keyframes as a performance shortcut.
+        try:
+            for frame in images:
+                model_management.throw_exception_if_processing_interrupted()
+                rgb = (
+                    frame[..., :3]
+                    .detach()
+                    .to(device="cpu", dtype=torch.float32)
+                    .clamp(0.0, 1.0)
+                    .numpy()
                 )
-            )
+                bgr = np.ascontiguousarray(
+                    (rgb[:, :, ::-1] * 255.0).round().astype(np.uint8)
+                )
+                options = dict(source=bgr, imgsz=640, conf=float(confidence),
+                               iou=float(iou_threshold), classes=class_ids, max_det=24,
+                               retina_masks=True, half=False, verbose=False)
+                try:
+                    result = model.predict(**options, device=inference_device)[0]
+                except torch.cuda.OutOfMemoryError:
+                    if inference_device == "cpu":
+                        raise
+                    print("[wan-post] mosaic GPU OOM; retrying this and remaining frames on CPU")
+                    model.to("cpu")
+                    torch.cuda.empty_cache()
+                    inference_device = "cpu"
+                    result = model.predict(**options, device="cpu")[0]
+                frame_masks.append(
+                    _segmentation_union(
+                        result, int(height), int(width), str(coverage_preset)
+                    )
+                )
+                del result
+
+        finally:
+            # Release VRAM even on cancellation or a non-OOM detector error.
+            # Errors must propagate; never emit an unprocessed video on failure.
+            if inference_device != "cpu":
+                model.to("cpu")
+                torch.cuda.empty_cache()
+        detected = time.perf_counter()
 
         masks = _fill_short_circular_gaps(frame_masks, int(max_gap_frames))
         resolved_block = _resolve_block_size(block_size, int(width), int(height))
 
         output = torch.empty_like(images, device="cpu")
         for index, frame in enumerate(images):
+            model_management.throw_exception_if_processing_interrupted()
             rgb = (
                 frame.detach()
                 .to(device="cpu", dtype=torch.float32)
@@ -392,10 +433,14 @@ class WanAutoMosaicVideo:
                 rgb[..., :3][mask] = pixelated[mask].astype(np.float32) / 255.0
             output[index] = torch.from_numpy(rgb).to(dtype=images.dtype)
 
+        ended = time.perf_counter()
+        print(f"[wan-post] mosaic frames={len(images)} device={inference_device} "
+              f"detect_seconds={detected-started:.3f} apply_seconds={ended-detected:.3f} "
+              f"seconds={ended-started:.3f}")
         return (output,)
 
 
 NODE_CLASS_MAPPINGS = {"WanAutoMosaicVideo": WanAutoMosaicVideo}
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "WanAutoMosaicVideo": "WAN Auto Mosaic JUST Segmentation (CPU)"
+    "WanAutoMosaicVideo": "WAN Auto Mosaic JUST Segmentation (Auto GPU / CPU)"
 }

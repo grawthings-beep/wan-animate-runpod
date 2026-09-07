@@ -40,9 +40,12 @@ env \
   /opt/runpod-wan-animate/scripts/start.sh
 
 test -d "${SMOKE_ROOT}/workspace/user/default/workflows"
-test "$(find "${SMOKE_ROOT}/workspace/user/default/workflows" -maxdepth 1 -name '*.json' | wc -l)" -ge 10
+test "$(find "${SMOKE_ROOT}/workspace/user/default/workflows" -maxdepth 1 -name '*.json' | wc -l)" -eq 2
 
 # ComfyUI can log an import failure and still pass quick-test-for-ci. Require
 # the new loader explicitly and verify actual quantized LoRA arithmetic.
 "$(command -v python || command -v python3)" \
   /opt/runpod-wan-animate/scripts/gguf_lora_smoke.py --comfy-dir "${COMFYUI_DIR}"
+
+"$(command -v python || command -v python3)" \
+  /opt/runpod-wan-animate/scripts/postprocess_smoke.py --comfy-dir "${COMFYUI_DIR}"

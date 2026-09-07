@@ -19,49 +19,8 @@ LIGHTNING_SOURCE = (
     / "WAN 2.2 Native Enhanced Lightning Long Video.json"
 )
 OUTPUTS = {
-    "aio": ROOT / "workflows" / "wan22_smooth_v6_aio_runpod.json",
-    "i2v_mosaic": (
-        ROOT / "workflows" / "wan22_smooth_v6_i2v_auto_mosaic_runpod.json"
-    ),
-    "loop": ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json",
-    "loop_core": (
-        ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_core_runpod.json"
-    ),
-    "batch10": (
-        ROOT
-        / "workflows"
-        / "wan22_smooth_v6_seamless_loop_batch10_runpod.json"
-    ),
-    "batch10_core": (
-        ROOT
-        / "workflows"
-        / "wan22_smooth_v6_seamless_loop_batch10_core_runpod.json"
-    ),
-    "loop_mosaic": (
-        ROOT
-        / "workflows"
-        / "wan22_smooth_v6_seamless_loop_auto_mosaic_runpod.json"
-    ),
-    "loop_mosaic_core": (
-        ROOT
-        / "workflows"
-        / "wan22_smooth_v6_seamless_loop_core_auto_mosaic_runpod.json"
-    ),
-    "batch10_mosaic": (
-        ROOT
-        / "workflows"
-        / "wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod.json"
-    ),
-    "batch10_mosaic_core": (
-        ROOT
-        / "workflows"
-        / "wan22_smooth_v6_seamless_loop_batch10_core_auto_mosaic_runpod.json"
-    ),
-    "lightning": (
-        ROOT
-        / "workflows"
-        / "wan22_native_enhanced_lightning_longvideo_runpod.json"
-    ),
+    "single": ROOT / "workflows" / "wan22_loop_single_runpod.json",
+    "batch10": ROOT / "workflows" / "wan22_loop_batch10_runpod.json",
 }
 
 MODEL_RENAMES = {
@@ -97,9 +56,9 @@ ENHANCED_MODELS = (
 )
 ENHANCED_GUIDE = (
     "ENHANCED V2 Q8 / LIGHTNING BUILT IN\n\n"
-    "5 total steps: HIGH 0 -> 2, LOW 2 -> 5; Euler / simple, CFG 1. "
-    "Both samplers must use the same total steps. For a faster 2+2 trial, "
-    "set BOTH totals to 4 and LOW end_at_step to 4 (HIGH ends at 2). "
+    "4 total steps: HIGH 0 -> 2, LOW 2 -> 4; Euler / simple, CFG 1. "
+    "Both samplers must use the same total steps. For a slower 2+3 trial, "
+    "set BOTH totals to 5 and LOW end_at_step to 5 (HIGH ends at 2). "
     "Shared shift 8 is retained from the loop preset.\n\n"
     "Do NOT add LightX2V or Lightning: acceleration is already merged into "
     "these checkpoints. Additional LoRAs are optional and OFF by default; "
@@ -114,7 +73,8 @@ ENHANCED_GUIDE = (
     "and compatibility with Enhanced V2 still require generation tests.\n\n"
     "This preset uses ordinary KSamplerAdvanced, without NAG. At CFG 1 the "
     "negative prompt has no effect. Avoid assuming stronger negative text "
-    "will change the result. Base size: 528 x 704.\n\n"
+    "will change the result. Base size: 720 x 960; AI output: 1440 x 1920. "
+    "This is native 720 x 960 generation, not a hidden low-resolution pass.\n\n"
 )
 
 
@@ -192,11 +152,11 @@ def patch_enhanced_inference(graph, model_ids, sampler_ids):
                 _top_level_link(graph, item["link"])[4] = slot
         node["type"] = "KSamplerAdvanced"
         node["properties"] = copy.deepcopy(properties)
-        node["title"] = "HIGH - 2 steps" if index == 0 else "LOW - 3 steps"
+        node["title"] = "HIGH - 2 steps" if index == 0 else "LOW - 2 steps"
         node["widgets_values"] = (
-            ["enable", 971822274029260, "randomize", 5, 1, "euler", "simple", 0, 2, "enable"]
+            ["enable", 971822274029260, "randomize", 4, 1, "euler", "simple", 0, 2, "enable"]
             if index == 0 else
-            ["disable", 0, "fixed", 5, 1, "euler", "simple", 2, 5, "disable"]
+            ["disable", 0, "fixed", 4, 1, "euler", "simple", 2, 4, "disable"]
         )
     graph["links"] = [link for link in graph["links"] if link[0] not in removed_links]
     for node in graph["nodes"]:
@@ -205,7 +165,7 @@ def patch_enhanced_inference(graph, model_ids, sampler_ids):
                 output["links"] = [n for n in output["links"] if n not in removed_links]
     graph.setdefault("extra", {}).setdefault("runpod_bundle", {}).update({
         "model_family": "enhanced-v2-q8-lightning",
-        "inference_steps": "2+3",
+        "inference_steps": "2+2",
         "additional_loras_default": "off",
     })
 
@@ -438,13 +398,7 @@ def nodes_in_group(graph, group_id):
 
 
 def patch_model_upscale(graph, downscale_id):
-    """Replace a preset's Lanczos resize with a stable model upscale.
-
-    The 4x NMKD-Siax pass restores detail per decoded frame. A subsequent
-    nearest-exact 0.5 resize preserves the workflow's existing net 2x output
-    resolution without adding a large video-upscaler dependency or keeping a
-    second diffusion model resident beside WAN.
-    """
+    """Use a 2x SPAN model; process frames individually at fixed output scale."""
     by_id = {node["id"]: node for node in graph["nodes"]}
     downscale = by_id[downscale_id]
     source_link_id = downscale["inputs"][0]["link"]
@@ -473,18 +427,18 @@ def patch_model_upscale(graph, downscale_id):
         "outputs": [
             {"name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": []}
         ],
-        "title": "AI UPSCALE MODEL (67 MB)",
+        "title": "AI UPSCALE MODEL - 2x SPAN (4.5 MB)",
         "properties": {
             "Node name for S&R": "UpscaleModelLoader",
             "cnr_id": "comfy-core",
         },
-        "widgets_values": "4x_NMKD-Siax_200k.pth",
+        "widgets_values": ["2xNomosUni_span_multijpg.safetensors"],
         "color": "#233",
         "bgcolor": "#355",
     }
     upscale = {
         "id": upscale_id,
-        "type": "ImageUpscaleWithModel",
+        "type": "WanLoopModelUpscale",
         "pos": [300, 3200],
         "size": [250, 72],
         "flags": {},
@@ -493,14 +447,14 @@ def patch_model_upscale(graph, downscale_id):
         "inputs": [
             {"name": "upscale_model", "type": "UPSCALE_MODEL", "link": None},
             {"name": "image", "type": "IMAGE", "link": source_link_id},
+            {"name": "output_scale", "type": "FLOAT", "widget": {"name": "output_scale"}, "link": None},
         ],
         "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": []}],
-        "title": "NMKD-SIAX MODEL UPSCALE 4x",
+        "title": "FRAMEWISE AI UPSCALE - NET 2x",
         "properties": {
-            "Node name for S&R": "ImageUpscaleWithModel",
-            "cnr_id": "comfy-core",
+            "Node name for S&R": "WanLoopModelUpscale",
         },
-        "widgets_values": [],
+        "widgets_values": [2.0],
         "color": "#233",
         "bgcolor": "#355",
     }
@@ -510,19 +464,51 @@ def patch_model_upscale(graph, downscale_id):
     # only its destination from ImageScaleBy to the model upscaler.
     source_link[3] = upscale_id
     source_link[4] = 1
-    downscale["inputs"][0]["link"] = None
     append_link(graph, loader_id, 0, upscale_id, 0, "UPSCALE_MODEL")
-    append_link(graph, upscale_id, 0, downscale["id"], 0, "IMAGE")
-
-    downscale["pos"] = [580, 3200]
-    downscale["order"] = 141
-    downscale["title"] = "NET 2x OUTPUT (4x MODEL -> 0.5x)"
-    downscale["widgets_values"] = ["nearest-exact", 0.5]
+    # Bypass the old whole-video 4x -> 0.5x resize. Even when a user picks
+    # a 4x model, the new node resizes each frame before retaining it.
+    outgoing = list(downscale["outputs"][0].get("links") or [])
+    upscale["outputs"][0]["links"] = outgoing
+    for link_id in outgoing:
+        _top_level_link(graph, link_id)[1:3] = [upscale_id, 0]
+    graph["nodes"] = [node for node in graph["nodes"] if node["id"] != downscale_id]
     return graph
 
 
 def patch_loop_model_upscale(graph):
     return patch_model_upscale(graph, 320)
+
+
+def patch_native_resolution_interpolation(graph):
+    """Run temporal interpolation before spatial upscale, never at 4x pixels."""
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    mosaic = next(n for n in by_id.values() if n["type"] == "WanAutoMosaicVideo")
+    # Reconnect IMAGE links only. The loader and latent/conditioning links stay.
+    destinations = ((385, "anything", 384), (399, "frames", 385),
+                    (405, "image", 399), (mosaic["id"], "images", 405))
+    for target_id, input_name, source_id in destinations:
+        target = by_id[target_id]
+        input_slot = next(i for i, item in enumerate(target["inputs"]) if item["name"] == input_name)
+        link_id = target["inputs"][input_slot]["link"]
+        link = _top_level_link(graph, link_id)
+        by_id[link[1]]["outputs"][link[2]]["links"].remove(link_id)
+        graph["links"].remove(link)
+        target["inputs"][input_slot]["link"] = None
+        append_link(graph, source_id, 0, target_id, input_slot, "IMAGE")
+    # Same compact left-to-right postprocess lane in both canvases.
+    base_x, base_y = by_id[383]["pos"]
+    by_id[385]["pos"] = [base_x + 190, base_y + 90]
+    by_id[399]["pos"] = [base_x + 450, base_y - 20]
+    by_id[404]["pos"] = [base_x + 840, base_y - 10]
+    by_id[405]["pos"] = [base_x + 840, base_y + 100]
+    by_id[399]["title"] = "RIFE x2 - NATIVE RESOLUTION / ENSEMBLE OFF"
+    group = next(g for g in graph["groups"] if g["id"] == 56)
+    group["title"] = group["title"].replace("DECODE / AI UPSCALE / RIFE", "DECODE / RIFE / AI UPSCALE")
+    graph["extra"]["runpod_bundle"]["postprocess"] = (
+        "Native-resolution RIFE x2 without ensemble, framewise SPAN 2x, "
+        "per-frame JUST mosaic (AUTO GPU/CPU)"
+    )
+    return graph
 
 
 def _layout_node(by_id, node_id, position, size=None):
@@ -604,7 +590,6 @@ def patch_loop_layout(graph):
         384: ((3590, 940), (210, 46)),
         404: ((3400, 1040), (270, 58)),
         405: ((3690, 1040), (250, 72)),
-        320: ((3960, 1040), (250, 82)),
         385: ((4230, 1060), (173, 26)),
         399: ((4430, 930), (322, 270)),
         332: ((4980, 930), (480, 334)),
@@ -715,9 +700,12 @@ def patch_loop(aio):
     lora_group["bounding"][3] = 810
 
     resolution = by_id[328]
-    resolution["properties"]["valueX"] = 528
-    resolution["properties"]["valueY"] = 704
-    resolution["widgets_values"] = [528, 528, 704, 704, 0, 0]
+    resolution["properties"]["valueX"] = 720
+    resolution["properties"]["valueY"] = 960
+    resolution["widgets_values"] = [720, 720, 960, 960, 0, 0]
+    # Ensemble evaluates both directions. Keep interpolation, without the
+    # extra ensemble pass or the source's eight-frame GPU batch.
+    by_id[399]["widgets_values"] = ["rife49.pth", 10, 2, True, False, 1, "float16", False, 1]
 
     by_id[338]["title"] = "1. SELECT LOOP IMAGE (FIRST FRAME)"
     by_id[342]["title"] = "2. SELECT THE SAME IMAGE (LAST FRAME)"
@@ -1156,7 +1144,6 @@ def patch_loop_batch10_layout(graph, slot_ids, selector_id, finalizer_id):
         384: ((4940, 960), (210, 46)),
         404: ((4750, 1060), (270, 58)),
         405: ((5040, 1060), (250, 72)),
-        320: ((5310, 1060), (250, 82)),
         385: ((5580, 1080), (173, 26)),
         399: ((5780, 950), (322, 270)),
         332: ((6330, 950), (480, 334)),
@@ -1340,6 +1327,7 @@ def _auto_mosaic_node(node_id, position, order):
                 "widget": {"name": "target_classes"},
                 "link": None,
             },
+            {"name": "device", "type": "COMBO", "widget": {"name": "device"}, "link": None},
         ],
         "outputs": [
             {
@@ -1357,13 +1345,14 @@ def _auto_mosaic_node(node_id, position, order):
             0,
             3,
             "pussy,penis,testicles",
+            "auto",
         ],
-        "title": "AUTO MOSAIC JUST CONTOUR (CPU)",
+        "title": "AUTO MOSAIC JUST CONTOUR (AUTO GPU / CPU)",
     }
 
 
 def patch_auto_mosaic(loop, batch10=False):
-    """Insert CPU auto-mosaic after RIFE and before the only MP4 encode."""
+    """Insert auto-mosaic after RIFE and before the only MP4 encode."""
     graph = copy.deepcopy(loop)
     by_id = {node["id"]: node for node in graph["nodes"]}
     existing_bundle = graph.get("extra", {}).get("runpod_bundle", {})
@@ -1418,9 +1407,9 @@ def patch_auto_mosaic(loop, batch10=False):
         {
             "id": group_id,
             "title": (
-                "POST-RIFE AUTO MOSAIC (CPU)"
+                "POST-RIFE AUTO MOSAIC (AUTO DEVICE)"
                 if is_i2v
-                else "POST-RIFE AUTO MOSAIC (CPU / LOOP-SAFE)"
+                else "POST-RIFE AUTO MOSAIC (AUTO DEVICE / LOOP-SAFE)"
             ),
             "bounding": [0, 0, 1, 1],
             "color": "#7a3f83",
@@ -1508,7 +1497,8 @@ def patch_auto_mosaic(loop, batch10=False):
             "AUTO MOSAIC OUTPUT PRESET\n\n"
             "Mosaic is applied to completed frames after RIFE and before MP4 "
             "encoding. Anime NSFW Detection v5.0 produces a per-pixel instance "
-            "segmentation mask on CPU, so WAN keeps exclusive GPU VRAM. JUST "
+            "segmentation mask on every frame. AUTO uses GPU after WAN has "
+            "finished, with CPU fallback if VRAM is insufficient. JUST "
             "matches the AutoMosaic iPhone contour preset: segmentation only "
             "with a 4% mask dilation. Default targets are pussy, penis, and "
             "testicles; anus is deliberately excluded. block_size=0 automatically uses short "
@@ -1531,7 +1521,7 @@ def patch_auto_mosaic(loop, batch10=False):
                 )
             ),
             "profile": bundle.get("profile", "loop-all"),
-            "postprocess": "Anime NSFW Detection v5 YOLO11-seg JUST contour mosaic after RIFE (CPU)",
+            "postprocess": "Framewise SPAN 2x, RIFE x2 without ensemble, per-frame JUST mosaic (AUTO GPU/CPU)",
             "requires_all_referenced_assets": True,
         }
     )
@@ -1646,29 +1636,12 @@ def main():
     args = parser.parse_args()
 
     smooth_source = json.loads(SMOOTH_SOURCE.read_text(encoding="utf-8-sig"))
-    lightning_source = json.loads(
-        LIGHTNING_SOURCE.read_text(encoding="utf-8-sig")
-    )
     aio = patch_aio(smooth_source)
-    i2v = patch_i2v(aio)
     loop = patch_loop(aio)
-    loop_core = patch_loop_core(loop)
     batch10 = patch_loop_batch10(loop)
-    batch10_core = patch_loop_batch10(loop_core)
     generated = {
-        "aio": encode(aio),
-        "i2v_mosaic": encode(patch_auto_mosaic(i2v)),
-        "loop": encode(loop),
-        "loop_core": encode(loop_core),
-        "batch10": encode(batch10),
-        "batch10_core": encode(batch10_core),
-        "loop_mosaic": encode(patch_auto_mosaic(loop)),
-        "loop_mosaic_core": encode(patch_auto_mosaic(loop_core)),
-        "batch10_mosaic": encode(patch_auto_mosaic(batch10, batch10=True)),
-        "batch10_mosaic_core": encode(
-            patch_auto_mosaic(batch10_core, batch10=True)
-        ),
-        "lightning": encode(patch_lightning(lightning_source)),
+        "single": encode(patch_native_resolution_interpolation(patch_auto_mosaic(loop))),
+        "batch10": encode(patch_native_resolution_interpolation(patch_auto_mosaic(batch10, batch10=True))),
     }
 
     changed = []
@@ -1681,6 +1654,8 @@ def main():
             path.write_bytes(expected)
             print(f"WROTE {path.relative_to(ROOT)}")
 
+    unexpected = set((ROOT / "workflows").glob("*_runpod.json")) - set(OUTPUTS.values())
+    changed.extend(str(path.relative_to(ROOT)) for path in sorted(unexpected))
     if changed:
         print("Generated workflows are stale: " + ", ".join(changed), file=sys.stderr)
         return 1

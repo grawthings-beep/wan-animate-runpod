@@ -2,13 +2,13 @@
 
 対象ワークフロー:
 
-`wan22_smooth_v6_seamless_loop_batch10_runpod.json`
+`wan22_loop_batch10_runpod.json`
 
-完成動画へ自動モザイクを入れる場合は、同じ操作で`wan22_smooth_v6_seamless_loop_batch10_auto_mosaic_runpod.json`を使います。各ジョブのRIFE後・MP4保存前にCPU処理し、最後のZIPにはモザイク済み10本だけが入ります。
+各ジョブのRIFE後・MP4保存前に自動モザイクを適用し、最後のZIPにはモザイク済み10本だけが入ります。GPU優先・CPU fallback、全フレーム検出です。モザイク別版やcore別版はありません。
 
 ## 使い方
 
-1. `01`〜`10` の各スロットで画像を1枚選び、その画像に対応するpositive promptを入力します。
+1. 画像10枚入りフォルダ/ZIPと、空行で10ブロックに区切った`prompts.txt`を一括投入欄へdropします。各prompt内は複数行で構いません。ZIPに画像とprompts.txtをまとめても使えます。手動で各スロットを編集する方法も残っています。
 2. 紫色の `QUEUE 10 LOOPS — ONE JOB AT A TIME` ノードにある `QUEUE 10 LOOPS (SEQUENTIAL)` ボタンを1回だけ押します。
 3. ComfyUIのQueueには独立した10ジョブが入り、1本ずつ順番に生成されます。通常の画面上部にあるQueueボタンは、この操作には使いません。
 4. 10本目まで成功すると、10本のMP4とprompt一覧を記録した `manifest.json` を含むZIPが自動ダウンロードされます。

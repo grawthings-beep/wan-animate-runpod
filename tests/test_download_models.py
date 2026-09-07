@@ -268,7 +268,8 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 29)
+        self.assertEqual(len(selected), 30)
+        self.assertIn("2xNomosUni_span_multijpg.safetensors", selected)
         self.assertIn("wind.safetensors", selected)
         self.assertIn("4x_NMKD-Siax_200k.pth", selected)
         self.assertIn("animeNSFWDetection_v50.zip", selected)
@@ -603,7 +604,7 @@ class DownloadModelsTests(unittest.TestCase):
         import json
 
         workflow = json.loads(
-            (ROOT / "workflows" / "wan22_smooth_v6_seamless_loop_runpod.json").read_text(
+            (ROOT / "workflows" / "wan22_loop_single_runpod.json").read_text(
                 encoding="utf-8"
             )
         )
@@ -661,21 +662,13 @@ class DownloadModelsTests(unittest.TestCase):
         self.assertEqual(entry["requires_env"], ["CIVITAI_API_TOKEN"])
         self.assertEqual(entry["auth_query_env"], "CIVITAI_API_TOKEN")
 
-    def test_lightning_profile_contains_every_workflow_asset(self):
+    def test_retired_lightning_download_profile_remains_backward_compatible(self):
         import json
 
         manifest = json.loads(
             (ROOT / "config" / "wan22-models.json").read_text(encoding="utf-8")
         )
-        workflow = json.loads(
-            (
-                ROOT
-                / "workflows"
-                / "wan22_native_enhanced_lightning_longvideo_runpod.json"
-            ).read_text(encoding="utf-8")
-        )
-        profile = workflow["extra"]["runpod_bundle"]["profile"]
-        self.assertEqual(profile, "lightning-longvideo")
+        profile = "lightning-longvideo"
         groups = DOWNLOAD_MODELS.selected_groups(manifest, profile)
         selected = {
             pathlib.PurePosixPath(entry["path"]).name

@@ -225,10 +225,7 @@ def main():
         dependencies,
         manifest.get("profiles") or {},
         errors,
-        workflow_paths=[
-            path for path in WORKFLOW_PATHS
-            if "seamless_loop" in path.name or "i2v_auto_mosaic" in path.name
-        ],
+        workflow_paths=WORKFLOW_PATHS,
     )
 
     if errors:

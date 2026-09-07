@@ -100,7 +100,7 @@ cuda-preflight -> workflows -> models -> validation -> ready -> ComfyUI
 ```text
 [gpu-preflight] TORCH STACK READY
 [gpu-preflight] READY
-MODEL PROFILE: loop-all (29 assets)
+MODEL PROFILE: loop-all (30 assets)
 TRANSFER ENGINE: 4 files in parallel
 [check_env] ... required_missing=0
 BOOT PHASE: comfyui-exec
@@ -110,26 +110,30 @@ BOOT PHASE: comfyui-exec
 
 Edgeだけ403になりChromeでは開く場合、RunPod proxy自体ではなくEdge側に残ったRunPod認証cookie・追跡防止・拡張機能が原因です。InPrivateで開く、`runpod.net`のsite dataを削除、追跡防止をBalancedへ変更の順で確認します。
 
-## 通常I2V＋自動モザイク
+## 開くワークフローは2本だけ
 
-ループさせない動画は`wan22_smooth_v6_i2v_auto_mosaic_runpod.json`を開きます。
+- 単体：`wan22_loop_single_runpod.json`
+- 10本逐次：`wan22_loop_batch10_runpod.json`
 
-1. `1. SELECT START IMAGE`へ開始画像を1枚入れます。
-2. positive promptへ開始から終了までの動作を時系列で書きます。開始姿勢へ戻す指示は不要です。
-3. ペアで配布されたLoRAはHigh／Lowの対応する2行を両方ONにします。単体の`wind.safetensors`はLow行だけをONにします。
-4. Queueすると、通常I2V、AIアップスケール、RIFE、自動モザイク、MP4保存の順に1本だけ実行されます。
+両方ともAIアップスケール・RIFE・自動モザイク付き。core/通常/モザイク有無の別ファイルは廃止しました。`MODEL_PROFILE=loop-core`でも同じ2本を使い、未取得LoRAの行だけを起動時に除きます。環境変数の追加はありません。
 
-このworkflowは`MODEL_PROFILE=loop-all`の29 assetをそのまま利用するため、上記の環境変数を変更する必要はありません。モザイク対象は既定で`pussy,penis,testicles`、`anus`は除外です。
+旧同梱11本・hash付きの旧コピー・更新前の同梱名の編集版は`/workspace/comfyui/workflow-backups/`へ退避します。任意の名前で保存したユーザーworkflowはそのままです。新しいimageを使っても開きっぱなしのcanvasは旧版のため、必ず新しい名前のworkflowを開いてください。
+
+単体ではFIRST/LASTへ同じ画像を選び、positive promptを入力して通常のQueueを押します。初期生成サイズ720×960、最終出力1440×1920、約5秒。自動モザイクの対象と輪郭は従来どおりです。
 
 ## Enhanced V2 Q8の初回確認
 
 新しいSHA imageを使い、同梱workflowを開き直します。モデル欄が`ENHANCED V2 Q8`のHigh/Low、samplerが両方`KSamplerAdvanced`、全LoRAがOFFなら新presetです。古いJSONのモデル名だけを変えるとGGUFを読み込めません。
 
-設定は両samplerで`steps=5 / cfg=1 / euler / simple`、High `start=0 / end=2`、Low `start=2 / end=5`。LightX2V/Lightningは追加しません。CFG 1ではnegative promptは無効です。ループは同一画像を両端に指定する仕組みを継続し、batch10では自動で同一画像が配線されます。
+設定は両samplerで`steps=4 / cfg=1 / euler / simple`、High `start=0 / end=2`、Low `start=2 / end=4`。LightX2V/Lightningは追加しません。CFG 1ではnegative promptは無効です。batch10では同一画像が両端へ自動で配線されます。
+
+アップスケールの選択欄は`2xNomosUni_span_multijpg.safetensors`になっていることを確認します。「4」しか表示される場合は旧workflowです。旧NMKDを選んでも最終倍率2倍は維持されますが重くなります。RIFEは拡大前に処理し、ensemble OFF、batch_size=1。その後SPANで2倍にします。モザイクのdeviceはautoでGPU優先・OOM時CPUへ復帰し、cpu固定も選べます。全フレームを検出する点は変わりません。
+
+生成が遅い場合は`[wan-post]`のupscale/mosaic秒数と、sampler進捗・`Prompt executed in ...`を含むログで比較します。初回ロード込みと2回目では時間が違うため、GPU名と何回目の生成かも控えてください。
 
 ## Wind motion LoRAの使用
 
-`wind.safetensors`を試す場合は、同梱workflowを開き直して**LOW LORA LOADERのwind行をON**にします（初期値1.0 / OFF）。High/LowペアではなくLow側で学習された単体LoRAです。通常ループ・batch10・モザイク版・core版すべてに配置済みで、既存の環境変数のまま自動取得されます。batch10ではこのLoRA設定が10本に共通で適用されます。
+`wind.safetensors`は両方のworkflowのLow側に1.0 / OFFで残しています。相性や最適強度は未確認なので、まずOFFで比較します。batch10ではLoRA設定が10本に共通で適用されます。
 
 ## Batch10の一括投入
 

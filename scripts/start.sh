@@ -204,30 +204,9 @@ YAML
 write_extra_model_paths "${COMFYUI_DIR}/extra_model_paths.yaml"
 write_extra_model_paths "${COMFYUI_DIR}/extra_model_paths.yml"
 
-# Workflows and user settings live on the volume. Keep the familiar filename
-# on a fresh volume. If an image update changes a bundled workflow, preserve
-# the existing file and install the new content under a hash-versioned name.
+# Two canonical canvases, with recoverable backups outside ComfyUI's list.
 WORKFLOW_SRC="${WORKFLOW_SRC:-/opt/runpod-wan-animate/workflows}"
 WORKFLOW_DST="${WORKFLOW_DST:-${WORKSPACE_DIR}/user/default/workflows}"
-if compgen -G "${WORKFLOW_SRC}/*.json" > /dev/null 2>&1; then
-  mkdir -p "${WORKFLOW_DST}"
-  for workflow_source in "${WORKFLOW_SRC}"/*.json; do
-    workflow_name="$(basename "${workflow_source}")"
-    workflow_target="${WORKFLOW_DST}/${workflow_name}"
-    if [[ ! -e "${workflow_target}" ]]; then
-      cp "${workflow_source}" "${workflow_target}"
-      echo "Installed bundled workflow: ${workflow_name}"
-    elif ! cmp -s "${workflow_source}" "${workflow_target}"; then
-      workflow_stem="${workflow_name%.json}"
-      workflow_hash="$(sha256sum "${workflow_source}" | cut -c1-12)"
-      workflow_versioned="${WORKFLOW_DST}/${workflow_stem}-bundle-${workflow_hash}.json"
-      if [[ ! -e "${workflow_versioned}" ]]; then
-        cp "${workflow_source}" "${workflow_versioned}"
-        echo "Installed updated workflow: $(basename "${workflow_versioned}")"
-      fi
-    fi
-  done
-fi
 
 manifest_ready=0
 if [[ -n "${MODEL_MANIFEST_JSON:-}" ]]; then
@@ -259,6 +238,11 @@ if [[ "${manifest_ready}" != "1" ]]; then
   cp /opt/runpod-wan-animate/config/wan22-models.json "${manifest_tmp}"
   mv -f "${manifest_tmp}" "${MODEL_MANIFEST}"
 fi
+
+"${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/install_workflows.py \
+  --source "${WORKFLOW_SRC}" --destination "${WORKFLOW_DST}" \
+  --backup "${WORKSPACE_DIR}/workflow-backups" \
+  --manifest "${MODEL_MANIFEST}" --profile "${MODEL_PROFILE}"
 
 if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
   DOWNLOADER_LIBS="/opt/runpod-wan-animate/downloader-libs"

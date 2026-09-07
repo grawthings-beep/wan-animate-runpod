@@ -126,6 +126,14 @@ class ContainerContractTests(unittest.TestCase):
         self.assertIn("http.version=HTTP/1.1", installer)
         self.assertTrue(all(re.fullmatch(r"[0-9a-f]{40}", entry[2]) for entry in entries))
 
+    def test_real_upscale_and_mosaic_fallback_are_required_build_gates(self):
+        smoke = (ROOT / "scripts/container_smoke.sh").read_text(encoding="utf-8")
+        self.assertIn("scripts/postprocess_smoke.py", smoke)
+        runtime = (ROOT / "scripts/postprocess_smoke.py").read_text(encoding="utf-8")
+        for operation in ("load_model(filename)", "hashlib.sha256", "torch.isfinite",
+                          "torch.cuda.OutOfMemoryError", "failed.offloads"):
+            self.assertIn(operation, runtime)
+
     def test_legacy_full_build_is_manual_only(self):
         full_ci = (ROOT / ".github/workflows/build-full.yml").read_text(
             encoding="utf-8"
