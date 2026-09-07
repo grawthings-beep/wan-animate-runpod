@@ -90,6 +90,28 @@ SAMPLER_NODE_TYPES = {
     "KSamplerWithNAG (Advanced)",
 }
 
+ENHANCED_GGUF_COMMIT = "6ea2651e7df66d7585f6ffee804b20e92fb38b8a"
+ENHANCED_MODELS = (
+    "wan22EnhancedNSFWSVICamera_nsfwV2Q8High.gguf",
+    "wan22EnhancedNSFWSVICamera_nsfwV2Q8Low.gguf",
+)
+ENHANCED_GUIDE = (
+    "ENHANCED V2 Q8 / LIGHTNING BUILT IN\n\n"
+    "5 total steps: HIGH 0 -> 2, LOW 2 -> 5; Euler / simple, CFG 1. "
+    "Both samplers must use the same total steps. For a faster 2+2 trial, "
+    "set BOTH totals to 4 and LOW end_at_step to 4 (HIGH ends at 2). "
+    "Shared shift 8 is retained from the loop preset.\n\n"
+    "Do NOT add LightX2V or Lightning: acceleration is already merged into "
+    "these checkpoints. Additional LoRAs are optional and OFF by default; "
+    "old SmoothMix strengths are not an Enhanced quality recommendation. "
+    "GGUF supports LoRA loading, but matching the WAN architecture does not "
+    "guarantee visual compatibility. Compare a single matching pair against "
+    "the LoRA-free baseline with a fixed seed.\n\n"
+    "This preset uses ordinary KSamplerAdvanced, without NAG. At CFG 1 the "
+    "negative prompt has no effect. Avoid assuming stronger negative text "
+    "will change the result. Base size: 528 x 704.\n\n"
+)
+
 
 def replace_model_names(value):
     if isinstance(value, str):
@@ -124,6 +146,63 @@ def configure_lora_node(node, entries):
     ]
     if isinstance(node.get("size"), list) and len(node["size"]) > 1:
         node["size"][1] = max(float(node["size"][1]), 190 + 48 * len(entries))
+
+
+def patch_enhanced_inference(graph, model_ids, sampler_ids):
+    """Use the selected Lightning-merged Q8 pair, keeping all graph outputs."""
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    for node_id, filename, stage in zip(model_ids, ENHANCED_MODELS, ("HIGH", "LOW")):
+        node = by_id[node_id]
+        node["type"] = "UnetLoaderGGUF"
+        node["title"] = f"ENHANCED V2 Q8 - {stage} (Lightning built in)"
+        node["inputs"] = [{
+            "name": "unet_name", "type": "COMBO",
+            "widget": {"name": "unet_name"}, "link": None,
+        }]
+        node["properties"] = {
+            "Node name for S&R": "UnetLoaderGGUF",
+            "aux_id": "city96/ComfyUI-GGUF",
+            "ver": ENHANCED_GGUF_COMMIT,
+        }
+        node["widgets_values"] = [filename]
+
+    # Copy the real core sampler schema. Match input links by name, not slot:
+    # removing NAG shifts latent_image and every widget slot by one or more.
+    template = by_id[sampler_ids[0]]
+    input_schema = copy.deepcopy(template["inputs"])
+    properties = copy.deepcopy(template["properties"])
+    removed_links = set()
+    for index, node_id in enumerate(sampler_ids):
+        node = by_id[node_id]
+        previous = {item["name"]: item for item in node["inputs"]}
+        retained_names = {item["name"] for item in input_schema}
+        removed_links.update(
+            item["link"] for name, item in previous.items()
+            if name not in retained_names and item.get("link") is not None
+        )
+        node["inputs"] = copy.deepcopy(input_schema)
+        for slot, item in enumerate(node["inputs"]):
+            item["link"] = previous.get(item["name"], {}).get("link")
+            if item["link"] is not None:
+                _top_level_link(graph, item["link"])[4] = slot
+        node["type"] = "KSamplerAdvanced"
+        node["properties"] = copy.deepcopy(properties)
+        node["title"] = "HIGH - 2 steps" if index == 0 else "LOW - 3 steps"
+        node["widgets_values"] = (
+            ["enable", 971822274029260, "randomize", 5, 1, "euler", "simple", 0, 2, "enable"]
+            if index == 0 else
+            ["disable", 0, "fixed", 5, 1, "euler", "simple", 2, 5, "disable"]
+        )
+    graph["links"] = [link for link in graph["links"] if link[0] not in removed_links]
+    for node in graph["nodes"]:
+        for output in node.get("outputs", []):
+            if output.get("links"):
+                output["links"] = [n for n in output["links"] if n not in removed_links]
+    graph.setdefault("extra", {}).setdefault("runpod_bundle", {}).update({
+        "model_family": "enhanced-v2-q8-lightning",
+        "inference_steps": "2+3",
+        "additional_loras_default": "off",
+    })
 
 
 def remove_nodes(graph, node_ids):
@@ -581,13 +660,8 @@ def patch_loop(aio):
     configure_lora_node(
         by_id[325],
         [
-            lora(
-                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
-                3.0,
-                True,
-            ),
-            lora("NSFW-22-H-e8.safetensors", 2.75, True),
-            lora("SmoothXXXAnimation_High.safetensors", 1.5, True),
+            lora("NSFW-22-H-e8.safetensors", 1.0),
+            lora("SmoothXXXAnimation_High.safetensors", 1.0),
             lora("Cumshot_Aesthetics_High.safetensors", 1.0),
             lora("I2V_joi_trend_high.safetensors", 1.0),
             lora("Wan22_ThroatV3_High.safetensors", 1.0),
@@ -610,13 +684,8 @@ def patch_loop(aio):
     configure_lora_node(
         by_id[324],
         [
-            lora(
-                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
-                1.5,
-                True,
-            ),
-            lora("NSFW-22-L-e8.safetensors", 1.65, True),
-            lora("SmoothXXXAnimation_Low.safetensors", 1.0, True),
+            lora("NSFW-22-L-e8.safetensors", 1.0),
+            lora("SmoothXXXAnimation_Low.safetensors", 1.0),
             lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
             lora("I2V_joi_trend_low.safetensors", 1.0),
             lora("Wan22_ThroatV3_Low.safetensors", 1.0),
@@ -646,7 +715,6 @@ def patch_loop(aio):
 
     by_id[338]["title"] = "1. SELECT LOOP IMAGE (FIRST FRAME)"
     by_id[342]["title"] = "2. SELECT THE SAME IMAGE (LAST FRAME)"
-    existing_note = str(by_id[323].get("widgets_values") or "")
     by_id[323]["widgets_values"] = (
         "SEAMLESS LOOP PRESET\n\n"
         "Use exactly the same source image in FIRST FRAME and LAST FRAME. "
@@ -654,21 +722,14 @@ def patch_loop(aio):
         "or irreversible actions. Generate 81 frames first; extend only after "
         "the short loop is clean. This preset is deliberately silent so the "
         "audio track cannot introduce a seam.\n\n"
-        "Core LoRAs are ON: LightX2V 3.0 High / 1.5 Low, NSFW-22 2.75 High / "
-        "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Anime Cumshot "
-        "Aesthetics, JOI Handjob Trend, and Deepthroat/Face Fuck v3 High/Low "
-        "pairs are available at 1.0 but OFF by default. Cumshot Aesthetics targets the official WAN base "
-        "and may be unstable with an AIO/merged model. The JOI pair is native "
-        "WAN 2.2 I2V-A14B. Five iroiroLoRA High/Low effect pairs are also "
-        "available at 1.0 and OFF by default; enable one matching pair at a "
-        "time. Default base resolution is 528 x 704.\n\n"
-        + existing_note
+        + ENHANCED_GUIDE
     )
     combine = by_id[332].get("widgets_values")
     if isinstance(combine, dict):
         combine["filename_prefix"] = "Video/loops/%date:yyyy-MM-dd%/%date:hhmmss%-loop"
         combine["loop_count"] = 0
 
+    patch_enhanced_inference(graph, (315, 316), (329, 330))
     patch_loop_model_upscale(graph)
     patch_loop_layout(graph)
     graph.setdefault("extra", {})["runpod_bundle"]["preset"] = "seamless-loop"
@@ -794,13 +855,8 @@ def patch_i2v(aio):
     configure_lora_node(
         by_id[201],
         [
-            lora(
-                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
-                3.0,
-                True,
-            ),
-            lora("NSFW-22-H-e8.safetensors", 2.75, True),
-            lora("SmoothXXXAnimation_High.safetensors", 1.5, True),
+            lora("NSFW-22-H-e8.safetensors", 1.0),
+            lora("SmoothXXXAnimation_High.safetensors", 1.0),
             lora("Cumshot_Aesthetics_High.safetensors", 1.0),
             lora("I2V_joi_trend_high.safetensors", 1.0),
             lora("Wan22_ThroatV3_High.safetensors", 1.0),
@@ -814,13 +870,8 @@ def patch_i2v(aio):
     configure_lora_node(
         by_id[200],
         [
-            lora(
-                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
-                1.5,
-                True,
-            ),
-            lora("NSFW-22-L-e8.safetensors", 1.65, True),
-            lora("SmoothXXXAnimation_Low.safetensors", 1.0, True),
+            lora("NSFW-22-L-e8.safetensors", 1.0),
+            lora("SmoothXXXAnimation_Low.safetensors", 1.0),
             lora("Cumshot_Aesthetics_Low.safetensors", 1.0),
             lora("I2V_joi_trend_low.safetensors", 1.0),
             lora("Wan22_ThroatV3_Low.safetensors", 1.0),
@@ -846,12 +897,7 @@ def patch_i2v(aio):
         "the motion does not need to be cyclic. The default is 528 x 704, "
         "5 seconds / 81 generated frames, AI model upscale to a net 2x size, "
         "then RIFE x2 and CPU contour mosaic before MP4 encoding.\n\n"
-        "Core LoRAs are ON: LightX2V 3.0 High / 1.5 Low, NSFW-22 2.75 High / "
-        "1.65 Low, and SmoothXXXAnimation 1.5 High / 1.0 Low. Cumshot "
-        "Aesthetics, JOI Handjob Trend, Deepthroat/Face Fuck v3, and five "
-        "iroiro High/Low pairs are available at 1.0 but OFF. Enable only the "
-        "matching High and Low pair needed for the shot. The Deepthroat v3 "
-        "pair is Wan22_ThroatV3_High / Wan22_ThroatV3_Low.\n\n"
+        + ENHANCED_GUIDE +
         "This preset is deliberately silent; it does not download or load "
         "MMAudio models."
     )
@@ -870,30 +916,33 @@ def patch_i2v(aio):
         "source": "WAN 2.2 Smooth Workflow v6.0 I2V",
         "preset": "i2v",
     }
+    patch_enhanced_inference(graph, (197, 186), (236, 237))
     return graph
 
 
 def patch_loop_core(loop):
-    """Remove every disabled optional LoRA from the production core preset."""
+    """Keep the two existing small optional pairs, without enabling them."""
     graph = copy.deepcopy(loop)
     for node in graph.get("nodes", []):
         if node.get("type") != "Power Lora Loader (rgthree)":
             continue
-        enabled = [
+        retained = [
             copy.deepcopy(item)
             for item in node.get("widgets_values", [])
-            if isinstance(item, dict) and item.get("lora") and item.get("on")
+            if isinstance(item, dict) and item.get("lora", "").startswith(
+                ("NSFW-22-", "SmoothXXXAnimation_")
+            )
         ]
-        configure_lora_node(node, enabled)
-        node["size"][1] = 190 + 48 * len(enabled)
+        configure_lora_node(node, retained)
+        node["size"][1] = 190 + 48 * len(retained)
 
     note = next((node for node in graph["nodes"] if node.get("id") == 323), None)
     if note:
         note["widgets_values"] = (
             "LOOP CORE PRESET\n\n"
-            "Only the enabled LightX2V, NSFW-22, and SmoothXXXAnimation "
-            "High/Low pairs are present. This avoids downloading 5.78 GB of "
-            "disabled optional LoRAs and prevents false missing-model notices. "
+            "Only the optional NSFW-22 and SmoothXXXAnimation High/Low pairs "
+            "are present, both OFF by default. The other optional LoRAs are "
+            "omitted from this core canvas and its download profile. "
             "Use the non-core workflow with MODEL_PROFILE=loop-all when those "
             "optional effects are needed.\n\n"
             + str(note.get("widgets_values") or "")
@@ -1214,7 +1263,8 @@ def patch_loop_batch10(loop):
         "a time.\n5. After job 10 succeeds, the browser downloads one ZIP with "
         "slot-01.mp4 through slot-10.mp4 plus manifest.json.\n\n"
         "Do not use the normal Queue button for this preset. A failed earlier "
-        "job intentionally prevents an incomplete ZIP from downloading."
+        "job intentionally prevents an incomplete ZIP from downloading.\n\n"
+        + ENHANCED_GUIDE
     )
     bundle = graph.setdefault("extra", {}).setdefault("runpod_bundle", {})
     bundle.update(

@@ -249,8 +249,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "text-common",
                 "clip-vision",
                 "vae-fp32",
-                "i2v",
-                "lightx-i2v",
+                "enhanced-i2v",
                 "loop-nsfw-loras",
                 "loop-xxx-loras",
                 "loop-cumshot-loras",
@@ -268,15 +267,19 @@ class DownloadModelsTests(unittest.TestCase):
             for entry in manifest["models"]
             if entry["group"] in groups
         }
-        self.assertEqual(len(selected), 29)
+        self.assertEqual(len(selected), 28)
         self.assertIn("4x_NMKD-Siax_200k.pth", selected)
         self.assertIn("animeNSFWDetection_v50.zip", selected)
-        self.assertIn(
+        self.assertNotIn(
             "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
             selected,
         )
         self.assertFalse(any(name.startswith("mmaudio_") for name in selected))
-        self.assertFalse(any(name.endswith(".gguf") for name in selected))
+        self.assertEqual({name for name in selected if name.endswith(".gguf")}, {
+            "wan22EnhancedNSFWSVICamera_nsfwV2Q8High.gguf",
+            "wan22EnhancedNSFWSVICamera_nsfwV2Q8Low.gguf",
+        })
+        self.assertFalse(any(name.startswith("smoothMix") for name in selected))
 
         self.assertTrue(
             {"NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"}.issubset(
@@ -359,6 +362,29 @@ class DownloadModelsTests(unittest.TestCase):
                 for entry in entries
             )
         )
+
+    def test_enhanced_q8_pair_matches_requested_civitai_files(self):
+        import json
+
+        manifest = json.loads((ROOT / "config/wan22-models.json").read_text(encoding="utf-8"))
+        entries = [e for e in manifest["models"] if e["group"] == "enhanced-i2v"]
+        expected = {
+            "High": (2584698, 2472092, "29af3ea7e6f6ebc3464b19ac7f46551e0ac59208a925d78f375e4bdc5331215c"),
+            "Low": (2584707, 2472025, "9bbbcdcff088b23088d89a57c70aa6096fd6ce3ca10f7471c09b945459b81df8"),
+        }
+        self.assertEqual(len(entries), 2)
+        for entry, stage in zip(entries, ("High", "Low")):
+            version, file_id, sha = expected[stage]
+            filename = f"wan22EnhancedNSFWSVICamera_nsfwV2Q8{stage}.gguf"
+            self.assertEqual(entry["path"], f"models/diffusion_models/{filename}")
+            self.assertEqual(entry["size_bytes"], 15406619136)
+            self.assertEqual(entry["sha256"], sha)
+            self.assertEqual(entry["source_url"], f"https://civitai.com/api/download/models/{version}?fileId={file_id}")
+            self.assertEqual(DOWNLOAD_MODELS.parse_huggingface_url(entry["url"]), (
+                "rgomezs2010/loras_wan", "5bf53853f0b8908861e755cbbc4add0a2b976fbf", filename,
+            ))
+            self.assertFalse(entry.get("requires_env"))
+        self.assertEqual(manifest["profiles"]["loop-quality"]["include_groups"], manifest["profiles"]["loop-all"]["include_groups"])
 
     def test_loop_xxx_loras_use_hugging_face_backup(self):
         import json
@@ -576,8 +602,7 @@ class DownloadModelsTests(unittest.TestCase):
                 "text-common",
                 "clip-vision",
                 "vae-fp32",
-                "i2v",
-                "lightx-i2v",
+                "enhanced-i2v",
                 "loop-nsfw-loras",
                 "loop-xxx-loras",
                 "rife49",

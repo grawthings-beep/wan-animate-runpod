@@ -38,6 +38,45 @@ class WorkflowWiringTests(unittest.TestCase):
     def load(self, path):
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def test_enhanced_pair_and_lightning_schedule_in_every_production_workflow(self):
+        for path in (*LOOP_WORKFLOWS, I2V_MOSAIC):
+            with self.subTest(path=path.name):
+                graph = self.load(path)
+                by_id = {node["id"]: node for node in graph["nodes"]}
+                links = {link[0]: link for link in graph["links"]}
+                model_ids = (197, 186) if path == I2V_MOSAIC else (315, 316)
+                sampler_ids = (236, 237) if path == I2V_MOSAIC else (329, 330)
+                for node_id, suffix in zip(model_ids, ("High", "Low")):
+                    node = by_id[node_id]
+                    self.assertEqual(node["type"], "UnetLoaderGGUF")
+                    self.assertEqual(node["widgets_values"], [
+                        f"wan22EnhancedNSFWSVICamera_nsfwV2Q8{suffix}.gguf"
+                    ])
+                    self.assertEqual([i["name"] for i in node["inputs"]], ["unet_name"])
+                    self.assertEqual(node["properties"]["aux_id"], "city96/ComfyUI-GGUF")
+                high, low = [by_id[n] for n in sampler_ids]
+                for node in (high, low):
+                    self.assertEqual(node["type"], "KSamplerAdvanced")
+                    self.assertEqual(node["widgets_values"][3:7], [5, 1, "euler", "simple"])
+                    self.assertFalse(any(i["name"].startswith("nag_") for i in node["inputs"]))
+                self.assertEqual(high["widgets_values"][7:], [0, 2, "enable"])
+                self.assertEqual(low["widgets_values"][7:], [2, 5, "disable"])
+                self.assertEqual(high["widgets_values"][0], "enable")
+                self.assertEqual(low["widgets_values"][0], "disable")
+                latent = next(i for i in low["inputs"] if i["name"] == "latent_image")
+                self.assertEqual(links[latent["link"]][1:3], [high["id"], 0])
+                # Standard CFG=1 baseline must not quietly retain an active
+                # distiller or the old high-strength style stack.
+                for node in graph["nodes"]:
+                    if node["type"] == "Power Lora Loader (rgthree)":
+                        for item in node["widgets_values"]:
+                            if isinstance(item, dict) and item.get("lora"):
+                                self.assertFalse(item["on"])
+                                self.assertNotIn("lightx", item["lora"].lower())
+                self.assertEqual(graph["extra"]["runpod_bundle"]["model_family"], "enhanced-v2-q8-lightning")
+                notes = [str(n.get("widgets_values", "")) for n in graph["nodes"] if n["type"] in ("Note", "Note Plus (mtb)")]
+                self.assertTrue(any("At CFG 1" in note for note in notes), "Missing CFG=1 usage warning")
+
     def test_sampler_subgraphs_are_flattened(self):
         aio_expected = {
             234: "KSamplerWithNAG (Advanced)",
@@ -51,11 +90,11 @@ class WorkflowWiringTests(unittest.TestCase):
             WORKFLOWS[0]: aio_expected,
             WORKFLOWS[1]: {
                 329: "KSamplerAdvanced",
-                330: "KSamplerWithNAG (Advanced)",
+                330: "KSamplerAdvanced",
             },
             WORKFLOWS[2]: {
                 329: "KSamplerAdvanced",
-                330: "KSamplerWithNAG (Advanced)",
+                330: "KSamplerAdvanced",
             },
         }
         for path, expected in expected_by_path.items():
@@ -70,8 +109,6 @@ class WorkflowWiringTests(unittest.TestCase):
     def test_nag_negative_fanout_is_preserved(self):
         node_ids_by_path = {
             WORKFLOWS[0]: (237, 330),
-            WORKFLOWS[1]: (330,),
-            WORKFLOWS[2]: (330,),
         }
         for path, node_ids in node_ids_by_path.items():
             with self.subTest(path=path.name):
@@ -118,7 +155,8 @@ class WorkflowWiringTests(unittest.TestCase):
                 decode = by_id[384]
                 cleanup = by_id[links[decode["inputs"][0]["link"]][1]]
                 sampler = by_id[links[cleanup["inputs"][0]["link"]][1]]
-                self.assertEqual(sampler["type"], "KSamplerWithNAG (Advanced)")
+                expected = "KSamplerWithNAG (Advanced)" if path == WORKFLOWS[0] else "KSamplerAdvanced"
+                self.assertEqual(sampler["type"], expected)
                 self.assertEqual(sampler["outputs"][0]["type"], "LATENT")
 
     def test_loop_workflow_has_requested_lora_configuration(self):
@@ -130,11 +168,10 @@ class WorkflowWiringTests(unittest.TestCase):
             for item in node["widgets_values"]
             if isinstance(item, dict) and item.get("lora")
         ]
-        self.assertEqual(len(entries), 22)
+        self.assertEqual(len(entries), 20)
         self.assertEqual(
             {item["lora"] for item in entries},
             {
-                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
                 "NSFW-22-H-e8.safetensors",
                 "NSFW-22-L-e8.safetensors",
                 "SmoothXXXAnimation_High.safetensors",
@@ -158,22 +195,13 @@ class WorkflowWiringTests(unittest.TestCase):
             },
         )
         active = {item["lora"] for item in entries if item["on"] is True}
-        self.assertEqual(
-            active,
-            {
-                "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
-                "NSFW-22-H-e8.safetensors",
-                "NSFW-22-L-e8.safetensors",
-                "SmoothXXXAnimation_High.safetensors",
-                "SmoothXXXAnimation_Low.safetensors",
-            },
-        )
+        self.assertEqual(active, set())
         nsfw = [item for item in entries if item["lora"].startswith("NSFW-22-")]
         self.assertEqual(
             {item["lora"]: item["strength"] for item in nsfw},
             {
-                "NSFW-22-H-e8.safetensors": 2.75,
-                "NSFW-22-L-e8.safetensors": 1.65,
+                "NSFW-22-H-e8.safetensors": 1.0,
+                "NSFW-22-L-e8.safetensors": 1.0,
             },
         )
         smooth_xxx = [
@@ -182,11 +210,11 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertEqual(
             {item["lora"]: item["strength"] for item in smooth_xxx},
             {
-                "SmoothXXXAnimation_High.safetensors": 1.5,
+                "SmoothXXXAnimation_High.safetensors": 1.0,
                 "SmoothXXXAnimation_Low.safetensors": 1.0,
             },
         )
-        self.assertTrue(all(item["on"] is True for item in smooth_xxx))
+        self.assertTrue(all(item["on"] is False for item in smooth_xxx))
         cumshot = [
             item for item in entries if item["lora"].startswith("Cumshot_Aesthetics_")
         ]
@@ -354,7 +382,8 @@ class WorkflowWiringTests(unittest.TestCase):
             with self.subTest(path=path.name):
                 graph = self.load(path)
                 types = {node["type"] for node in graph["nodes"]}
-                self.assertNotIn("UnetLoaderGGUF", types)
+                self.assertNotIn("UNETLoader", types)
+                self.assertEqual(sum(node["type"] == "UnetLoaderGGUF" for node in graph["nodes"]), 2)
                 self.assertNotIn("MMAudioModelLoader", types)
                 self.assertNotIn("MMAudioFeatureUtilsLoader", types)
 
@@ -503,7 +532,8 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertNotIn("WanFirstLastFrameToVideo", types)
         self.assertNotIn("MMAudioModelLoader", types)
         self.assertNotIn("MMAudioFeatureUtilsLoader", types)
-        self.assertNotIn("UnetLoaderGGUF", types)
+        self.assertNotIn("UNETLoader", types)
+        self.assertEqual(types.count("UnetLoaderGGUF"), 2)
 
         conditioning = next(
             node for node in graph["nodes"] if node["type"] == "WanImageToVideo"
@@ -712,7 +742,7 @@ class WorkflowWiringTests(unittest.TestCase):
                             f"groups {first['id']} and {second['id']} overlap",
                         )
 
-    def test_core_variants_only_reference_enabled_loras(self):
+    def test_core_variants_keep_two_optional_pairs_off(self):
         for path in CORE_WORKFLOWS:
             with self.subTest(path=path.name):
                 graph = self.load(path)
@@ -723,8 +753,8 @@ class WorkflowWiringTests(unittest.TestCase):
                     for item in node["widgets_values"]
                     if isinstance(item, dict) and item.get("lora")
                 ]
-                self.assertEqual(len(entries), 6)
-                self.assertTrue(all(item["on"] is True for item in entries))
+                self.assertEqual(len(entries), 4)
+                self.assertTrue(all(item["on"] is False for item in entries))
                 self.assertEqual(
                     graph["extra"]["runpod_bundle"]["profile"], "loop-core"
                 )

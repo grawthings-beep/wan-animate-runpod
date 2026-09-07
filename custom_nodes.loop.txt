@@ -7,6 +7,7 @@ rgthree-comfy|https://github.com/rgthree/rgthree-comfy.git|27b4f4cdcf3b127c29d5d
 ComfyUI-VideoHelperSuite|https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git|4ee72c065db22c9d96c2427954dc69e7b908444b
 ComfyUI-Frame-Interpolation|https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git|26545cc2dd95bc3d27f056016300673bdeee78f5
 ComfyUI-Easy-Use|https://github.com/yolain/ComfyUI-Easy-Use.git|54d080bf6a4f52da287e984f305243c10db097f5
-ComfyUI-NAG|https://github.com/scottmudge/ComfyUI-NAG.git|c6f27116a8259f5b501d498a09e51c82fa72e35f
+ComfyUI-GGUF|https://github.com/city96/ComfyUI-GGUF.git|6ea2651e7df66d7585f6ffee804b20e92fb38b8a
+ComfyUI-KJNodes|https://github.com/kijai/ComfyUI-KJNodes.git|e27a505b3ba6ce42687fe00500deda103d9d6071
 ComfyUI_Comfyroll_CustomNodes|https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git|d78b780ae43fcf8c6b7c6505e6ffb4584281ceca
 ComfyUI-mxToolkit|https://github.com/Smirnov75/ComfyUI-mxToolkit.git|7f7a0e584f12078a1c589645d866ae96bad0cc35

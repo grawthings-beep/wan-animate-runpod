@@ -4,23 +4,23 @@
   "profiles": {
     "full": {
       "description": "Every model and LoRA referenced by or linked from both bundled workflow families.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "auto-mosaic", "upscale-nmkd", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "auto-mosaic", "upscale-nmkd", "t2v", "lightx-i2v-extra", "lightx-t2v-extra", "smoothmix-loras", "audio", "rife49", "rife-vfi", "alternate-gguf", "lightning-native-fp8-extras", "lightning-native-models", "lightning-native-loras", "lightning-native-tools"]
     },
     "i2v-quality": {
       "description": "High-quality I2V with the author's required LightX2V rank128 accelerator and interpolation.",
       "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "rife49", "rife-vfi"]
     },
     "loop-core": {
-      "description": "Production seamless-loop pack with only the three enabled High/Low LoRA pairs, core encoders, RIFE 4.9, and the CPU contour-mosaic detector. No disabled optional LoRAs are downloaded or shown.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
+      "description": "Enhanced V2 Q8 Lightning-built-in loop pack with two optional High/Low LoRA pairs (OFF by default), encoders, VAE, RIFE, CPU mosaic, and AI upscaler. No external Lightning/LightX2V is required.",
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "loop-all": {
       "description": "Complete seamless-loop pack. Adds Cumshot Aesthetics, JOI Handjob Trend, Deepthroat/Face Fuck v3, and all five iroiroLoRA High/Low pairs to loop-core for optional manual use.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "loop-quality": {
       "description": "Deprecated compatibility alias for loop-all. New templates should use loop-core or loop-all.",
-      "include_groups": ["text-common", "clip-vision", "vae-fp32", "i2v", "lightx-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
+      "include_groups": ["text-common", "clip-vision", "vae-fp32", "enhanced-i2v", "loop-nsfw-loras", "loop-xxx-loras", "loop-cumshot-loras", "loop-joi-loras", "loop-throat-loras", "loop-iroiro-high-loras", "loop-iroiro-low-loras", "rife49", "auto-mosaic", "upscale-nmkd"]
     },
     "t2v-quality": {
       "description": "Latest SmoothMix T2V v4 High/Low pair (LightX2V is baked in) and interpolation.",
@@ -68,6 +68,24 @@
       "requires_env": ["CIVITAI_API_TOKEN"],
       "auth_query_env": "CIVITAI_API_TOKEN",
       "headers": {"Authorization": "Bearer ${CIVITAI_API_TOKEN}"}
+    },
+    {
+      "name": "WAN 2.2 Enhanced V2 Q8 High (Lightning built in)",
+      "group": "enhanced-i2v",
+      "url": "https://huggingface.co/rgomezs2010/loras_wan/resolve/5bf53853f0b8908861e755cbbc4add0a2b976fbf/wan22EnhancedNSFWSVICamera_nsfwV2Q8High.gguf",
+      "path": "models/diffusion_models/wan22EnhancedNSFWSVICamera_nsfwV2Q8High.gguf",
+      "size_bytes": 15406619136,
+      "sha256": "29af3ea7e6f6ebc3464b19ac7f46551e0ac59208a925d78f375e4bdc5331215c",
+      "source_url": "https://civitai.com/api/download/models/2584698?fileId=2472092"
+    },
+    {
+      "name": "WAN 2.2 Enhanced V2 Q8 Low (Lightning built in)",
+      "group": "enhanced-i2v",
+      "url": "https://huggingface.co/rgomezs2010/loras_wan/resolve/5bf53853f0b8908861e755cbbc4add0a2b976fbf/wan22EnhancedNSFWSVICamera_nsfwV2Q8Low.gguf",
+      "path": "models/diffusion_models/wan22EnhancedNSFWSVICamera_nsfwV2Q8Low.gguf",
+      "size_bytes": 15406619136,
+      "sha256": "9bbbcdcff088b23088d89a57c70aa6096fd6ce3ca10f7471c09b945459b81df8",
+      "source_url": "https://civitai.com/api/download/models/2584707?fileId=2472025"
     },
     {
       "name": "SmoothMix WAN 2.2 I2V v2 High",

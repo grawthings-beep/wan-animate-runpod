@@ -1,6 +1,6 @@
 # WAN 2.2 Seamless Loop for RunPod
 
-WAN 2.2 Smooth v6のシームレスループを、RunPodで毎回クリーンに立ち上げるためのbundleです。モデルを巨大なDocker imageへ埋め込まず、公式RunPod ComfyUI imageと固定済みcustom nodesを先にpullし、Pod起動後に検証済みモデルを4本並列で取得します。
+WAN 2.2 Smooth v6由来のシームレスループに、Enhanced V2 Q8 High/Low（Lightning内蔵）を組み込んだRunPod bundleです。モデルを巨大なDocker imageへ埋め込まず、公式RunPod ComfyUI imageと固定済みcustom nodesを先にpullし、Pod起動後に検証済みモデルを4本並列で取得します。
 
 ## v2の構成
 
@@ -11,19 +11,29 @@ WAN 2.2 Smooth v6のシームレスループを、RunPodで毎回クリーンに
 | RTX 4090系 | `ghcr.io/grawthings-beep/wan-animate-runpod:loop-ada-cu128-sha-<commit>` | CUDA 12.8 / Torch 2.10 cu128 |
 | RTX 5090・Blackwell系 | `ghcr.io/grawthings-beep/wan-animate-runpod:loop-blackwell-cu130-sha-<commit>` | CUDA 13.0 / Torch 2.10 cu130 |
 
-本番では可変tagではなく、GitHub Actionsが発行する40文字commit付きtagを使います。GPUとimageを間違えた場合、またはCUDA 13に必要な580未満のdriver hostへ割り当てられた場合は、46 GBを取る前に明示的に停止します。
+本番では可変tagではなく、GitHub Actionsが発行する40文字commit付きtagを使います。GPUとimageを間違えた場合、またはCUDA 13に必要な580未満のdriver hostへ割り当てられた場合は、大容量モデルを取る前に明示的に停止します。
 
-Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ入れると、モデル1本の変更でも巨大layerのpull・展開・registry cacheが発生し、今回の「Network Volumeなし・毎回新規取得」では不利だからです。大容量のSmoothMix本体は、SHA-256が一致するrevision固定済みHugging Face sourceを複数登録し、一次配布先の削除・404時には同じ`.part`を保ったままmirrorへ自動failoverします。
+Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ入れると、モデル1本の変更でも巨大layerのpull・展開・registry cacheが発生し、今回の「Network Volumeなし・毎回新規取得」では不利だからです。Enhanced本体2本（計30.81 GB）はCivitai指定file IDとSHA-256・サイズが一致するrevision固定済みHugging Face配信からHF Xetで取得し、失敗時はaria2へfallbackします。元のSmoothMixはlegacy profileに残し、そちらは複数の同一SHA mirrorへのfailoverも維持します。
+
+## Enhanced V2への移行
+
+- 指定モデルは[High 2584698 / file 2472092](https://civitai.com/models/2053259?modelVersionId=2584698)と[Low 2584707 / file 2472025](https://civitai.com/models/2053259?modelVersionId=2584707)。別版のSVI/Fast Moveとは混同しません。
+- 通常I2Vと全8本のloop派生を`UnetLoaderGGUF`へ変更。ファイル名の`smooth_v6`は既存利用との互換性のため残しています。新しいimageでも、ブラウザで開きっぱなしの古いcanvasは自動更新されないため、同梱workflowを開き直してください。
+- [作者の推奨](https://civitai.com/models/2053259?modelVersionId=2584698)に合わせ、High **2** + Low **3** steps、Euler/simple、CFG **1**。両samplerの`steps=5`、Highは`0→2`、Lowは`2→5`です。既存loopと同じshift 8を両側で共有します。
+- Lightning内蔵なので、外付けLightX2V/Lightningをloopから除外。NAGも外した標準sampler構成です。**CFG 1ではnegative promptは効きません。**
+- [ComfyUI-GGUFはLoRA patchに対応](https://github.com/city96/ComfyUI-GGUF/blob/6ea2651e7df66d7585f6ffee804b20e92fb38b8a/nodes.py)。手持ちの追加LoRAは選択肢に残しますが、初期値は全てOFFです。アーキテクチャの互換性と画質の相性は別で、従来の強度が新しいmergeで最適とは限りません。実際の各LoRAの画質はGPU生成での確認が必要です。
+- 最初と最後の同一画像conditioning、AIアップスケール、RIFE、後処理モザイク、batch10の逐次queue/ZIP保存は維持します。endpoint指定はループを助けますが、継ぎ目の自然さまでは保証しません。
+- 速度比較用の2+2設定は**両方の`steps=4`、High `0→2`、Low `2→4`**。LoRA patchや量子化展開、offloadのコストがあるので、Q8がFP8より速いとは限りません。まず同一画像・固定seedで比較してください。
 
 ## Model profile
 
 | profile | assets | download | 内容 |
 |---|---:|---:|---|
-| `loop-core` | 13 | 41.02 GB | 実際にONのLightX2V、NSFW-22、SmoothXXXAnimation High/Low、WAN本体、encoder、VAE、RIFE、モザイク検出器、NMKD-Siax AI upscaler |
-| `loop-all` | 29 | 46.81 GB | coreにCumshot、JOI、Deepthroat/Face Fuck v3、iroiro 5組のOFF LoRAを追加 |
-| `loop-quality` | 29 | 46.81 GB | 旧設定互換の`loop-all` alias |
+| `loop-core` | 12 | 41.27 GB | Enhanced V2 Q8、NSFW-22/SmoothXXXAnimationの2組（OFF）、encoder、VAE、RIFE、モザイク検出器、NMKD-Siax |
+| `loop-all` | 28 | 47.05 GB | coreと従来の追加LoRA全組（OFF）。外付けLightX2Vは不要 |
+| `loop-quality` | 28 | 47.05 GB | 旧設定互換の`loop-all` alias |
 
-最短起動なら`MODEL_PROFILE=loop-core`、追加済みLoRAを画面から選びたいなら`loop-all`です。core workflowにはOFF LoRAの行自体がないため、不足モデル警告も出ません。
+追加LoRAを2組に絞るなら`MODEL_PROFILE=loop-core`、手持ち全組を選びたいなら`loop-all`です。core workflowにはprofile外のLoRA行を置かないため、意図的に省いたモデルの不足警告を防ぎます。
 
 loop系はLanczos拡大ではなく、デコードした各フレームを`4x_NMKD-Siax_200k`で4倍AIアップスケールしてから`nearest-exact`で0.5倍へ戻すため、最終サイズは従来どおり実質2倍です。標準のComfyUIノードだけを使い、追加ダウンロードは約67 MBです。
 
@@ -76,10 +86,11 @@ auto-mosaic版は完成frameにCPUのYOLO11 segmentationを適用し、RIFE後�
 
 mainへのpushごとに以下を実行します。
 
-- 11 workflowの再生成差分と55 asset manifestの整合検査
+- 11 workflowの再生成差分と57 asset manifestの整合検査
 - Python unit tests、JavaScript構文、shell構文
 - Ada/cu128とBlackwell/cu130を2 job並列build
 - 各image内で本番`start.sh`を`--quick-test-for-ci`実行し、custom node import、CLI、writable user/workflow pathを検査
+- 両image内で小さなQ8 tensorへ合成LoRAを適用し、clone・forwardの実計算・解除までCPU検査。14B本体のGPU生成品質テストではありません
 - 高コストだったGitHub Actions cache exportを廃止し、profile別GHCR registry cacheを利用
 
 ## Local validation

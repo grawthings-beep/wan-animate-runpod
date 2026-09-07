@@ -101,7 +101,17 @@ class ContainerContractTests(unittest.TestCase):
 
         self.assertTrue(names(loop) < names(full))
         self.assertNotIn("ComfyUI-MMAudio", names(loop))
+        self.assertIn("ComfyUI-GGUF", names(loop))
+        self.assertIn("ComfyUI-KJNodes", names(loop))
+        self.assertNotIn("ComfyUI-NAG", names(loop))
         self.assertIn("COPY custom_nodes.loop.txt", self.loop)
+
+    def test_real_q8_lora_arithmetic_is_a_required_build_gate(self):
+        smoke = (ROOT / "scripts/container_smoke.sh").read_text(encoding="utf-8")
+        self.assertIn("scripts/gguf_lora_smoke.py", smoke)
+        test = (ROOT / "scripts/gguf_lora_smoke.py").read_text(encoding="utf-8")
+        for operation in ("Q8_0", "load_lora", "add_patches", "assert_close", "unpatch_model"):
+            self.assertIn(operation, test)
 
     def test_custom_node_fetches_are_retryable_and_commit_pinned(self):
         installer = (ROOT / "scripts/install_custom_nodes.sh").read_text(
