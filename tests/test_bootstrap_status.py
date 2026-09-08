@@ -45,6 +45,7 @@ class BootstrapStatusTests(unittest.TestCase):
         self.assertIn('href="/diagnostics.json"', page)
         self.assertIn("診断ファイルを保存", page)
         self.assertIn("待つだけでは生成は始まりません", page)
+        self.assertIn("box-sizing:border-box", page)
 
     def test_reset_clears_previous_failure_and_asset_progress(self):
         with tempfile.TemporaryDirectory() as temporary:

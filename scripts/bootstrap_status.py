@@ -57,12 +57,13 @@ def render_page(data):
 <title>WAN Loop / {state}</title>
 <style>
 :root{{color-scheme:dark;font-family:Inter,system-ui,sans-serif}}
+*{{box-sizing:border-box}}
 body{{margin:0;background:#0d1117;color:#e6edf3;display:grid;min-height:100vh;place-items:center}}
 main{{width:min(720px,88vw);background:#161b22;border:1px solid #30363d;border-radius:18px;padding:30px}}
 h1{{margin:0 0 18px;font-size:26px}} .phase{{color:#8b949e;text-transform:uppercase;letter-spacing:.12em}}
 .bar{{height:10px;background:#30363d;border-radius:99px;overflow:hidden;margin:24px 0}}
 .bar span{{display:block;width:45%;height:100%;background:#2f81f7;border-radius:99px;animation:move 1.4s ease-in-out infinite alternate}}
-pre{{white-space:pre-wrap;overflow-wrap:anywhere;color:#b1bac4}}
+pre{{white-space:pre-wrap;overflow-wrap:anywhere;color:#b1bac4;font-size:15px;line-height:1.6}}
 a.download{{display:inline-block;background:#2f81f7;color:white;padding:14px 18px;border-radius:10px;text-decoration:none}}
 [hidden]{{display:none!important}} body.failed .bar{{display:none}}
 @keyframes move{{to{{transform:translateX(122%)}}}}
