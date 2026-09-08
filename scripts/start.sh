@@ -4,6 +4,7 @@ set -Eeuo pipefail
 source /opt/runpod-wan-animate/scripts/common.sh
 
 BOOT_STARTED_EPOCH="$(date +%s)"
+BOOT_ID="${BOOT_STARTED_EPOCH}-$$-${RANDOM}"
 log_boot_phase() {
   local phase="$1"
   local now
@@ -27,11 +28,11 @@ if [[ -f /opt/comfyui-runtime-constraints.txt ]]; then
   export PIP_CONSTRAINT="${PIP_CONSTRAINT:-/opt/comfyui-runtime-constraints.txt}"
 fi
 
-# This must happen before the first process imports torch. A single RunPod GPU
-# is always addressed as container-local cuda:0 even when RunPod leaves a host
-# UUID (or nothing) in CUDA_VISIBLE_DEVICES.
-normalize_cuda_visibility
-print_cuda_environment
+# Respect RunPod/user visibility, including UUIDs and an intentionally empty mask.
+# Legacy templates may keep this variable; it no longer changes GPU selection.
+if [[ -n "${CUDA_NORMALIZE_VISIBLE_DEVICES+x}" ]]; then
+  echo "[cuda-bootstrap] CUDA_NORMALIZE_VISIBLE_DEVICES is deprecated and ignored; visibility is preserved."
+fi
 
 WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace/comfyui}"
 MODEL_ROOT="${MODEL_ROOT:-${WORKSPACE_DIR}}"
@@ -88,6 +89,7 @@ mkdir -p \
   "${YOLO_CONFIG_DIR}"
 
 BOOTSTRAP_STATUS_FILE="${BOOTSTRAP_STATUS_FILE:-${CONFIG_DIR}/bootstrap-status.json}"
+GPU_DIAGNOSTICS_FILE="${GPU_DIAGNOSTICS_FILE:-${CONFIG_DIR}/gpu-diagnostics.json}"
 BOOTSTRAP_STATUS_PID=""
 
 bootstrap_status_write() {
@@ -105,6 +107,7 @@ bootstrap_failure() {
   set +e
   echo "BOOT FAILED: exit=${exit_code} line=${line_number}" >&2
   bootstrap_status_write \
+    --preserve-failure \
     --state failed \
     --phase failed \
     --message "WAN loop startup failed" \
@@ -123,11 +126,13 @@ bootstrap_failure() {
 
 if [[ "${BOOTSTRAP_STATUS:-1}" == "1" ]]; then
   bootstrap_status_write \
+    --reset --boot-id "${BOOT_ID}" \
     --state initializing \
     --phase cuda-preflight \
     --message "GPUとCUDA runtimeを確認しています"
   "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/bootstrap_status.py serve \
     --file "${BOOTSTRAP_STATUS_FILE}" \
+    --diagnostics-file "${GPU_DIAGNOSTICS_FILE}" \
     --host "${LISTEN}" \
     --port "${PORT}" &
   BOOTSTRAP_STATUS_PID="$!"
@@ -159,20 +164,24 @@ PY
   fi
 fi
 
-# A broken RunPod host can expose the GPU through nvidia-smi while every CUDA
-# call fails. Detect that before paying the time and bandwidth for 40+ GB.
+# Check actual CUDA before 40+ GB of downloads; classify and save any failure.
+GPU_REPORT_ARGS=(--diagnostics-file "${GPU_DIAGNOSTICS_FILE}" --boot-id "${BOOT_ID}")
+if [[ "${BOOTSTRAP_STATUS:-1}" == "1" ]]; then
+  GPU_REPORT_ARGS+=(--status-file "${BOOTSTRAP_STATUS_FILE}")
+fi
 if [[ "${CUDA_PREFLIGHT:-1}" == "1" ]]; then
   "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/gpu_preflight.py \
     --python "${PYTHON_BIN}" \
     --timeout "${CUDA_READY_TIMEOUT:-90}" \
-    --interval "${CUDA_READY_INTERVAL:-10}"
+    --interval "${CUDA_READY_INTERVAL:-10}" \
+    "${GPU_REPORT_ARGS[@]}"
 else
   echo "WARN: GPU preflight disabled (CUDA_PREFLIGHT=${CUDA_PREFLIGHT:-0})." >&2
   # Disabling the host probe must not permit custom-node installs to silently
   # replace the pinned PyTorch/TorchVision/TorchAudio CUDA stack.
   "${PYTHON_BIN}" /opt/runpod-wan-animate/scripts/gpu_preflight.py \
     --python "${PYTHON_BIN}" \
-    --stack-only
+    --stack-only "${GPU_REPORT_ARGS[@]}"
 fi
 log_boot_phase "cuda-preflight-complete"
 bootstrap_status_write \

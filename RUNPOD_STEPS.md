@@ -4,19 +4,19 @@
 
 GitHub Actionsの最新成功runに対応するcommit SHAを使います。
 
-4090:
+4090 / 5090共通の第一候補:
 
 ```text
-ghcr.io/grawthings-beep/wan-animate-runpod:loop-ada-cu128-sha-<40文字SHA>
+ghcr.io/grawthings-beep/wan-animate-runpod:loop-cu128-sha-<40文字SHA>
 ```
 
-5090 / RTX PRO Blackwell:
+CUDA13対応driver環境の代替（5090専用ではありません）:
 
 ```text
-ghcr.io/grawthings-beep/wan-animate-runpod:loop-blackwell-cu130-sha-<40文字SHA>
+ghcr.io/grawthings-beep/wan-animate-runpod:loop-cu130-sha-<40文字SHA>
 ```
 
-`loop-ada-cu128`と`loop-blackwell-cu130`は便利な可変tagですが、RunPod側の古いcacheを避けるため本番はSHA tag推奨です。
+`loop-cu128`と`loop-cu130`は可変tagなので本番はSHA tag推奨です。旧`loop-ada-cu128` / `loop-blackwell-cu130`名もaliasとして発行します。GPU名だけの拒否は廃止しました。CI成功はbuild/CPU検証であり、4090/5090の実機生成を保証しません。
 
 ## 2. Storage
 
@@ -65,7 +65,6 @@ HF_XET_HIGH_PERFORMANCE=1
 HF_XET_NUM_CONCURRENT_RANGE_GETS=64
 HF_XET_CHUNK_CACHE_SIZE_BYTES=0
 HF_HUB_DOWNLOAD_TIMEOUT=300
-CUDA_NORMALIZE_VISIBLE_DEVICES=1
 CUDA_PREFLIGHT=1
 CUDA_READY_TIMEOUT=90
 CUDA_READY_INTERVAL=10
@@ -85,7 +84,9 @@ HF_TOKEN={{ RUNPOD_SECRET_HF_TOKEN }}
 MODEL_PROFILE=loop-core
 ```
 
-その場合は名前に`core`が付くworkflowを開いてください。profileとworkflowを混ぜると、意図的に省いたOFF LoRAをComfyUIが不足扱いします。
+workflow名はどちらのprofileでも同じ2本です。旧名の`core` workflowを探す必要はありません。
+
+以前の設定からは`CUDA_NORMALIZE_VISIBLE_DEVICES`を削除してください。残っていても新imageでは無視します。`CUDA_VISIBLE_DEVICES`自体は通常追加不要で、RunPodが与えた値を保持します。空の値や`-1`を自分で設定するとGPUが非表示になるため、その場合は診断に`device-selection`と表示します。
 
 ## 6. 起動確認
 
@@ -106,7 +107,17 @@ TRANSFER ENGINE: 4 files in parallel
 BOOT PHASE: comfyui-exec
 ```
 
-4090 imageを5090で使った場合、または逆の場合は`wrong image for GPU`でdownload前に止まります。5090 hostのdriverが580未満なら`incompatible CUDA 13 driver`です。この場合はStop/StartではなくPodをTerminateし、正しいimageで新規Deployしてください。
+失敗した場合は8188の「診断ファイルを保存」を押してください。iPhoneなら保存した`wan-gpu-diagnostics.json`をそのまま送れます。端末コマンド不要です。ファイルにはGPU/Pod IDなどが含まれるため公開しないでください。起動チェック中の8188にのみdownloadボタンがあり、ComfyUIへの切り替え後も元のJSONは`/workspace/config/gpu-diagnostics.json`に残ります。
+
+| 表示 | 確認対象 |
+|---|---|
+| `runtime-stack` | PyTorch依存関係の読み込み・固定版との一致 |
+| `device-selection` | GPUを非表示にするCUDA_VISIBLE_DEVICES指定 |
+| `device-access` | /dev/nvidia*の公開・権限・UVMのI/Oエラー |
+| `driver-library` / `driver-compatibility` | libcuda・CUDAとdriverの互換性 |
+| `cuda-memory` / `cuda-operation` | 最小CUDA演算のメモリ不足・実行失敗 |
+
+GPUの故障と断定したり、一律にPod削除を求めたりしません。モデルはCUDA確認成功まで取得しません。失敗ページは既定900秒保持し、Podの停止・削除は自動で行いません。停止中ではなく起動失敗で待機中のPodには料金が発生する場合があります。生成物や診断を保存せずにTerminateしないでください。
 
 Edgeだけ403になりChromeでは開く場合、RunPod proxy自体ではなくEdge側に残ったRunPod認証cookie・追跡防止・拡張機能が原因です。InPrivateで開く、`runpod.net`のsite dataを削除、追跡防止をBalancedへ変更の順で確認します。
 

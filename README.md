@@ -4,14 +4,14 @@ WAN 2.2 Smooth v6由来のシームレスループに、Enhanced V2 Q8 High/Low�
 
 ## v2の構成
 
-4090と5090を同じCUDA imageで動かしません。
+GPU名だけでは起動を拒否しません。4090/5090共通の第一候補は固定版cu128です。cu130も用意しますが、実際に割り当てられたdriverとの互換性が必要です。
 
-| GPU | Container image | CUDA / Torch |
+| 用途 | Container image | CUDA / Torch |
 |---|---|---|
-| RTX 4090系 | `ghcr.io/grawthings-beep/wan-animate-runpod:loop-ada-cu128-sha-<commit>` | CUDA 12.8 / Torch 2.10 cu128 |
-| RTX 5090・Blackwell系 | `ghcr.io/grawthings-beep/wan-animate-runpod:loop-blackwell-cu130-sha-<commit>` | CUDA 13.0 / Torch 2.10 cu130 |
+| 4090/5090共通の第一候補 | `ghcr.io/grawthings-beep/wan-animate-runpod:loop-cu128-sha-<commit>` | CUDA 12.8 / Torch 2.10 cu128 |
+| CUDA13環境の代替 | `ghcr.io/grawthings-beep/wan-animate-runpod:loop-cu130-sha-<commit>` | CUDA 13.0 / Torch 2.10 cu130 |
 
-本番では可変tagではなく、GitHub Actionsが発行する40文字commit付きtagを使います。GPUとimageを間違えた場合、またはCUDA 13に必要な580未満のdriver hostへ割り当てられた場合は、大容量モデルを取る前に明示的に停止します。
+本番では可変tagではなく、GitHub Actionsが発行する40文字commit付きtagを使います。旧`loop-ada-cu128` / `loop-blackwell-cu130`名は互換aliasです。`CUDA_VISIBLE_DEVICES`はUUID・未設定・空欄を含め自動上書きしません。モデル取得前に実際のCUDAメモリ確保・FP16行列積・同期を確認します。CI成功はGPU実機の動画生成成功を保証しません。
 
 Docker imageにはモデルを含めません。WAN本体とLoRAをOCI layerへ入れると、モデル1本の変更でも巨大layerのpull・展開・registry cacheが発生し、今回の「Network Volumeなし・毎回新規取得」では不利だからです。Enhanced本体2本（計30.81 GB）はCivitai指定file IDとSHA-256・サイズが一致するrevision固定済みHugging Face配信からHF Xetで取得し、失敗時はaria2へfallbackします。元のSmoothMixはlegacy profileに残し、そちらは複数の同一SHA mirrorへのfailoverも維持します。
 
@@ -64,7 +64,7 @@ batch10は10本を同時にGPUへ載せません。専用の一括投入欄へ10
 
 ```text
 8188 status page
-  -> GPU / image / driver / Torch実演算検査
+  -> 固定Torch stack / CUDA実演算検査（失敗時はdriver・デバイス診断）
   -> workflow配置
   -> disk容量検査
   -> 大きいモデルから4本並列取得（HF Xet + aria2 + 同一SHA mirror failover）
@@ -72,7 +72,9 @@ batch10は10本を同時にGPUへ載せません。専用の一括投入欄へ10
   -> 同じ8188をComfyUIへhandoff
 ```
 
-起動直後からRunPodのConnectボタンで8188を開けます。まだComfyUIが起動していなくても、現在のphase、asset数、検証済みGB、失敗理由が表示されます。失敗ページは既定で15分保持します。
+起動直後からRunPodのConnectボタンで8188を開けます。まだComfyUIが起動していなくても、現在のphase、asset数、検証済みGB、失敗理由が表示されます。失敗ページは既定で15分保持します。GPU起動失敗時は待機アニメーションを停止し、「診断ファイルを保存」からJSONを取得できます。長いターミナルコマンドの貼り付けは不要です。Podを自動停止・削除しないため、失敗中も料金が発生する場合があります。
+
+診断は`/workspace/config/gpu-diagnostics.json`へ毎起動保存します。PyTorch stack、CUDA演算、nvidia-smi、失敗時のUVMデバイスopen・major/minor・libcuda情報を含み、原因別に分類します。TokenやURLは除去しますがGPU/Pod IDを含むため、公開せず個別調査に使ってください。`CUDA_PREFLIGHT=0`はstack-onlyと記録され、GPU実機成功とは扱いません。[起動診断の設計](docs/gpu-startup-diagnostics.md)
 
 同一PodをStop/Startした場合、RunPodのVolume Disk上の`/workspace`が残っていれば検証だけで再利用します。PodをTerminateして新しく作れば再downloadです。Network Volumeは不要です。
 
@@ -82,7 +84,7 @@ batch10は10本を同時にGPUへ載せません。専用の一括投入欄へ10
 
 最低限:
 
-1. GPUに合うimmutable image tagを指定。
+1. まず`loop-cu128-sha-<commit>`を指定。GPU名による使い分けは不要。
 2. Volume Diskは`loop-core`なら80 GB以上、`loop-all`なら100 GB推奨。
 3. HTTP Portに`ComfyUI / 8188`を追加。
 4. 環境変数へexampleを貼り、`HF_TOKEN`と`CIVITAI_API_TOKEN`はRunPod Secretsから割り当て。
@@ -93,11 +95,12 @@ mainへのpushごとに以下を実行します。
 
 - 2 workflowの再生成差分と59 asset manifestの整合検査
 - Python unit tests、JavaScript構文、shell構文
-- Ada/cu128とBlackwell/cu130を2 job並列build
+- cu128とcu130を2 job並列build（旧profile名はcache互換のため維持）
 - 各image内で本番`start.sh`を`--quick-test-for-ci`実行し、custom node import、CLI、writable user/workflow pathを検査
 - 両image内で小さなQ8 tensorへ合成LoRAを適用し、clone・forwardの実計算・解除までCPU検査。14B本体のGPU生成品質テストではありません
 - 両image内で実際のSPAN weightsを取得・ハッシュ検証・小画像の2倍推論を検査。4倍モデル選択時の出力寸法維持と、モザイクGPU OOM→CPU再試行も検査（OOMは模擬）
 - 高コストだったGitHub Actions cache exportを廃止し、profile別GHCR registry cacheを利用
+- 起動判定・診断JSON・HTTP download・Secret除去・起動ID分離を検査。Actions summaryにGPU hardware validation: NOT RUNを明記。実機GPUを使うCIはありません
 
 ## Local validation
 

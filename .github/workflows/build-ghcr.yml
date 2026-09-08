@@ -46,6 +46,8 @@ jobs:
             cuda: "12.8"
             gpu_family: ada
             image_tags: |
+              ghcr.io/${{ github.repository }}:loop-cu128
+              ghcr.io/${{ github.repository }}:loop-cu128-sha-${{ github.sha }}
               ghcr.io/${{ github.repository }}:loop-ada-cu128
               ghcr.io/${{ github.repository }}:loop-ada-cu128-sha-${{ github.sha }}
           - profile: loop-blackwell-cu130
@@ -56,6 +58,8 @@ jobs:
             cuda: "13.0"
             gpu_family: blackwell
             image_tags: |
+              ghcr.io/${{ github.repository }}:loop-cu130
+              ghcr.io/${{ github.repository }}:loop-cu130-sha-${{ github.sha }}
               ghcr.io/${{ github.repository }}:loop-blackwell-cu130
               ghcr.io/${{ github.repository }}:loop-blackwell-cu130-sha-${{ github.sha }}
     steps:
@@ -85,3 +89,8 @@ jobs:
             IMAGE_PROFILE=${{ matrix.profile }}
             BUNDLE_REVISION=${{ github.sha }}
           tags: ${{ matrix.image_tags }}
+      - name: Declare validation scope
+        run: |
+          echo "### ${{ matrix.profile }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Build and CPU smoke tests: PASSED" >> "$GITHUB_STEP_SUMMARY"
+          echo "GPU hardware validation: NOT RUN (no GPU runner)" >> "$GITHUB_STEP_SUMMARY"

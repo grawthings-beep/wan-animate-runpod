@@ -84,9 +84,19 @@ class ContainerContractTests(unittest.TestCase):
         self.assertIn("bootstrap_status.py serve", start)
         self.assertLess(start.index("bootstrap_status.py serve"), start.index("download_models.py"))
 
-    def test_cuda_visibility_is_normalized_before_gpu_probe(self):
+    def test_cuda_visibility_is_preserved_and_reports_are_wired(self):
         start = (ROOT / "scripts/start.sh").read_text(encoding="utf-8")
-        self.assertLess(start.index("normalize_cuda_visibility"), start.index("gpu_preflight.py"))
+        self.assertNotIn("normalize_cuda_visibility", start)
+        self.assertNotRegex(start, r"(?m)^\s*(?:export )?CUDA_VISIBLE_DEVICES=")
+        self.assertIn('--diagnostics-file "${GPU_DIAGNOSTICS_FILE}"', start)
+        self.assertIn('--reset --boot-id "${BOOT_ID}"', start)
+        self.assertIn('--preserve-failure', start)
+        self.assertIn('"${GPU_REPORT_ARGS[@]}"', start)
+
+    def test_gpu_neutral_tags_and_cpu_only_ci_notice(self):
+        for cuda in ("128", "130"):
+            self.assertIn(f"loop-cu{cuda}-sha-", self.ci)
+        self.assertIn("GPU hardware validation: NOT RUN", self.ci)
 
     def test_loop_image_uses_pinned_minimal_node_manifest(self):
         full = (ROOT / "custom_nodes.txt").read_text(encoding="utf-8")
